@@ -35,9 +35,9 @@ namespace
 
   struct map_color
     {
-    map_color(int32_t r, int32_t g, int32_t b, double h) : height(h)
+    map_color(int32_t r, int32_t g, int32_t b, int32_t a, double h) : height(h)
       {
-      clr = 0xff000000 | ((uint32_t)b) << 16 | ((uint32_t)g) << 8 | ((uint32_t)r);
+      clr = ((uint32_t)a) << 24 | ((uint32_t)b) << 16 | ((uint32_t)g) << 8 | ((uint32_t)r);
       }
     uint32_t clr;
     double height;
@@ -46,14 +46,14 @@ namespace
   std::vector<map_color> build_map_colors()
     {
     std::vector<map_color> clrs;
-    clrs.emplace_back(0, 0, 128, 0.0); // deeps
-    clrs.emplace_back(0, 0, 255, 0.05); // shallow
-    clrs.emplace_back(0, 128, 255, 0.1); // shore
-    clrs.emplace_back(240, 240, 64, 0.1625); // sand
-    clrs.emplace_back(32, 160, 0, 0.250); // grass
-    clrs.emplace_back(224, 224, 0, 0.4750); // dirt
-    clrs.emplace_back(128, 128, 128, 0.75); // rock
-    clrs.emplace_back(255, 255, 255, 1.0); // snow
+    clrs.emplace_back(0, 0, 128, 0, 0.0); // deeps
+    clrs.emplace_back(0, 0, 255, 255, 0.05); // shallow
+    clrs.emplace_back(0, 128, 255, 255, 0.1); // shore
+    clrs.emplace_back(240, 240, 64, 255, 0.1625); // sand
+    clrs.emplace_back(32, 160, 0, 255, 0.250); // grass
+    clrs.emplace_back(224, 224, 0, 255, 0.4750); // dirt
+    clrs.emplace_back(128, 128, 128, 255, 0.75); // rock
+    clrs.emplace_back(255, 255, 255, 255, 1.0); // snow
     std::sort(clrs.begin(), clrs.end(), [](const auto& left, const auto& right)
       {
       return left.height < right.height;
