@@ -35,6 +35,7 @@ struct settings
 
   int32_t render_target;
 
+  std::string export_folder;
   };
 
 

@@ -1,9 +1,19 @@
 #include "view.h"
+#include <algorithm>
 #include <stdexcept>
+#include <vector>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+#include "imguifilesystem.h"
+
+#include "rgba.h"
 
 namespace
   {
@@ -21,6 +31,79 @@ namespace
     SDL_LockSurface(surf);
     fill_rgba_buffer_with_image(surf->pixels, surf->pitch, im);
     SDL_UnlockSurface(surf);
+    }
+
+  struct map_color
+    {
+    map_color(int32_t r, int32_t g, int32_t b, double h) : height(h)
+      {
+      clr = 0xff000000 | ((uint32_t)b) << 16 | ((uint32_t)g) << 8 | ((uint32_t)r);
+      }
+    uint32_t clr;
+    double height;
+    };
+
+  std::vector<map_color> build_map_colors()
+    {
+    std::vector<map_color> clrs;
+    clrs.emplace_back(0, 0, 128, 0.0); // deeps
+    clrs.emplace_back(0, 0, 255, 0.05); // shallow
+    clrs.emplace_back(0, 128, 255, 0.1); // shore
+    clrs.emplace_back(240, 240, 64, 0.1625); // sand
+    clrs.emplace_back(32, 160, 0, 0.250); // grass
+    clrs.emplace_back(224, 224, 0, 0.4750); // dirt
+    clrs.emplace_back(128, 128, 128, 0.75); // rock
+    clrs.emplace_back(255, 255, 255, 1.0); // snow
+    std::sort(clrs.begin(), clrs.end(), [](const auto& left, const auto& right)
+      {
+      return left.height < right.height;
+      });
+    return clrs;
+    }
+
+  std::unique_ptr<image> image_height_to_color(const std::unique_ptr<image>& im_height, const std::vector<map_color>& colors)
+    {
+    std::unique_ptr<image> im_out = std::make_unique<image>();
+    im_out->init(im_height->width(), im_height->height());
+
+    double scale_range = colors.back().height - colors.front().height;
+
+    uint64_t* dest = im_out->data();
+    const uint64_t* height = im_height->data();
+    uint32_t count = im_out->size();
+    for (uint32_t i = 0; i < count; ++i)
+      {
+      double scale = (double)(*height & 0x7fff) / 0x7fff;
+      scale *= scale_range;
+      scale += colors.front().height;
+      if (scale <= colors.front().height)
+        {
+        uint32_t target_color = colors.front().clr;
+        *dest = get_color_64(target_color);
+        }
+      else if (scale >= colors.back().height)
+        {
+        uint32_t target_color = colors.back().clr;
+        *dest = get_color_64(target_color);
+        }
+      else
+        {
+        int k = 1;
+        while (colors[k].height < scale)
+          ++k;
+        uint32_t blend_color_1 = colors[k - 1].clr;
+        uint32_t blend_color_2 = colors[k].clr;
+        rgba c1(blend_color_1);
+        rgba c2(blend_color_2);        
+        double alpha = (scale - colors[k - 1].height) / (colors[k].height - colors[k-1].height);
+        rgba c3 = c1*(1-alpha) + c2 * alpha;
+        *dest = get_color_64(c3.color());
+        }
+      ++height;
+      ++dest;
+      }
+
+    return im_out;
     }
 
   }
@@ -172,6 +255,26 @@ void view::_imgui_ui()
       _dirty = true;
       }
 
+    static bool open_export_folder = false;
+    if (ImGui::Button("...##1"))
+      {
+      open_export_folder = true;
+      }
+    ImGui::SameLine();
+    static char export_folder[1024];
+    for (size_t i = 0; i <= _settings.export_folder.length(); ++i)
+      export_folder[i] = _settings.export_folder[i];
+    ImGui::InputText("Export folder", export_folder, IM_ARRAYSIZE(export_folder));
+    _settings.export_folder = std::string(export_folder);
+
+    static ImGuiFs::Dialog open_export_folder_dlg(false, true, true);
+    const char* openExportFolderChosenPath = open_export_folder_dlg.chooseFolderDialog(open_export_folder, _settings.export_folder.c_str(), "Open export folder", ImVec2(-1, -1), ImVec2(50, 50));
+    open_export_folder = false;
+    if (strlen(openExportFolderChosenPath) > 0)
+      {
+      _settings.export_folder = open_export_folder_dlg.getLastDirectory();
+      }
+
     if (ImGui::Button("Heightmap"))
       {
       _settings.render_target = 0;
@@ -195,6 +298,10 @@ void view::_imgui_ui()
       _settings.render_target = 3;
       _dirty = true;
       }
+    if (ImGui::Button("Export"))
+      {
+      _export_images();
+      }
     }
 
   ImGui::End();
@@ -203,12 +310,22 @@ void view::_imgui_ui()
   ImGui::Render();
   }
 
+void view::_export_images()
+  {
+  std::string heightmap_filename = _settings.export_folder + "/heightmap.png";
+  std::string normalmap_filename = _settings.export_folder + "/normalmap.png";
+  std::string colormap_filename = _settings.export_folder + "/colormap.png";
+  image_export(_heightmap, heightmap_filename.c_str(), image_export_filetype::png, 100);
+  image_export(_normalmap, normalmap_filename.c_str(), image_export_filetype::png, 100);
+  image_export(_colormap, colormap_filename.c_str(), image_export_filetype::png, 100);
+  }
+
 void view::_check_image()
   {
   if (!_dirty)
     return;
   bool _reallocate_sdl_surface = (_settings.width != _heightmap->width() || _settings.height != _heightmap->height());
-  _heightmap = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff, _settings.seed, _settings.mode, _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);  
+  _heightmap = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff, _settings.seed, _settings.mode, _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);
   _islandgradient = image_flat(_settings.width, _settings.height, 0xff000000);
   image_glow_rect(_islandgradient,
     _settings.island_center_x,
@@ -222,11 +339,12 @@ void view::_check_image()
     _settings.island_power,
     _settings.island_wrap,
     _settings.island_flags);
-  _colormap = _heightmap->copy();
   if (_settings.make_island)
     _heightmap = image_merge(2, 2, &_heightmap, &_islandgradient);
   _normalmap = image_normals(_heightmap, _settings.normalmap_strength, _settings.normalmap_mode);
 
+  std::vector<map_color> colors = build_map_colors();
+  _colormap = image_height_to_color(_heightmap, colors);
   if (_reallocate_sdl_surface)
     {
     SDL_FreeSurface(_heightmap_surface);

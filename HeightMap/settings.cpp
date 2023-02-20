@@ -59,6 +59,8 @@ settings read_settings(const char* filename)
   f["island_wrap"] >> s.island_wrap;
   f["island_flags"] >> s.island_flags;
   f["make_island"] >> s.make_island;
+
+  f["export_folder"] >> s.export_folder;
   return s;
   }
 
@@ -89,6 +91,8 @@ void write_settings(const settings& s, const char* filename)
   f << "island_wrap" << s.island_wrap;
   f << "island_flags" << s.island_flags;
   f << "make_island" << s.make_island;
+
+  f << "export_folder" << s.export_folder;
 
   f.release();
   }

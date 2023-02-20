@@ -15,11 +15,16 @@ ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_sdl/imgui_impl_sdl2.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_sdl/imgui_impl_sdlrenderer.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_sdl/imgui_tables.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_sdl/imgui_widgets.cpp
+
+${CMAKE_CURRENT_SOURCE_DIR}/../imgui_sdl/dirent_portable.h
+${CMAKE_CURRENT_SOURCE_DIR}/../imgui_sdl/imguifilesystem.cpp
+${CMAKE_CURRENT_SOURCE_DIR}/../imgui_sdl/imguifilesystem.h
 )
 
 set(HDRS
 image.h
 pref_file.h
+rgba.h
 settings.h
 view.h
     )

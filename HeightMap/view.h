@@ -18,6 +18,7 @@ class view
     void _poll_for_events();
     void _imgui_ui();    
     void _check_image();
+    void _export_images();
 
   private:
     uint32_t _w, _h;

@@ -8,6 +8,17 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb/stb_image_write.h"
 
+uint64_t get_color_64(uint32_t color)
+  {
+  uint64_t col = color;
+  col = ((col & 0xff000000) << 24)
+    | ((col & 0x00ff0000) << 16)
+    | ((col & 0x0000ff00) << 8)
+    | ((col & 0x000000ff));
+  col = ((col | (col << 8)) >> 1) & 0x7fff7fff7fff7fff;
+  return col;
+  }
+
 namespace
   {
 
@@ -19,17 +30,6 @@ namespace
       return 0;
     else
       return 0x7fff;
-    }
-
-  uint64_t get_color_64(uint32_t color)
-    {
-    uint64_t col = color;
-    col = ((col & 0xff000000) << 24)
-      | ((col & 0x00ff0000) << 16)
-      | ((col & 0x0000ff00) << 8)
-      | ((col & 0x000000ff));
-    col = ((col | (col << 8)) >> 1) & 0x7fff7fff7fff7fff;
-    return col;
     }
 
   float perlin_random[256][2];

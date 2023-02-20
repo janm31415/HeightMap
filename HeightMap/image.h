@@ -48,6 +48,8 @@ enum class image_export_filetype
   tga
   };
 
+uint64_t get_color_64(uint32_t color);
+
 void image_init();
 
 bool image_export(const std::unique_ptr<image>& im, const char* filename, image_export_filetype filetype, int32_t jpeg_quality);
