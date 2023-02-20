@@ -27,6 +27,9 @@ class view
     SDL_Texture* _heightmap_texture;
     bool _quit;
     std::unique_ptr<image> _heightmap;    
+    std::unique_ptr<image> _normalmap;
+    std::unique_ptr<image> _colormap;
+    std::unique_ptr<image> _islandgradient;
     settings _settings;
-    bool _dirty;
+    bool _dirty;    
   };

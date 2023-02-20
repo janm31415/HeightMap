@@ -17,6 +17,23 @@ struct settings
   int32_t mode;
   float amplify;
   float gamma;
+
+  int32_t normalmap_mode;
+  float normalmap_strength;
+  
+  float island_center_x;
+  float island_center_y;
+  float island_radius_x;
+  float island_radius_y;
+  float island_size_x;
+  float island_size_y;
+  float island_blend;
+  float island_power;
+  int32_t island_wrap;
+  int32_t island_flags;
+
+  int32_t render_target;
+
   };
 
 

@@ -136,27 +136,7 @@ namespace
 
   void fade_64(uint64_t& result, uint64_t& c0, uint64_t& c1, int32_t fade)
     {
-    /*
-    __m128i cc0, cc1, f, f1;
-    __m128i xor0 = _mm_cvtsi64_si128(0xffffffff00000000);
-    __m128i add0 = _mm_cvtsi64_si128(0x0000800100000000);
-    cc0 = _mm_cvtsi64_si128(c0);
-    cc1 = _mm_cvtsi64_si128(c1);
-    f = _mm_cvtsi32_si128(fade);
-    f = _mm_unpacklo_epi32(f, f);
-    f = _mm_srai_epi32(f, 1);
-    f = _mm_xor_si128(f, xor0);
-    f = _mm_add_epi32(f, add0);
-    f = _mm_packs_epi32(f, f);
-    f = _mm_unpacklo_epi16(f, f);
-    f = _mm_unpacklo_epi16(f, f);
-    f1 = _mm_unpackhi_epi16(f, f);
-    cc1 = _mm_mulhi_epi16(cc1, f);
-    cc0 = _mm_mulhi_epi16(cc0, f1);
-    cc0 = _mm_add_epi16(cc0, cc1);
-    cc0 = _mm_slli_epi16(cc0, 1);
-    result = _mm_cvtsi128_si64(cc0);
-    */
+#ifdef _WIN32
     __m128i col0 = _mm_loadl_epi64((const __m128i*) & c0);
     __m128i col1 = _mm_loadl_epi64((const __m128i*) & c1);
 
@@ -168,9 +148,17 @@ namespace
     __m128i diffms = _mm_slli_epi16(diffm, 1);
     __m128i res = _mm_subs_epi16(col0, diffms);
 
-
     _mm_storel_epi64((__m128i*) & result, res);
-
+#else
+    int64_t f1 = fade;
+    int64_t f0 = 0x10000 - fade;
+    uint64_t a = c0;
+    uint64_t b = c1;
+    result = ((((((a >> 0) & 0xffff) * f0) >> 16) + ((((b >> 0) & 0xffff) * f1) >> 16)) << 0)
+      + ((((((a >> 16) & 0xffff) * f0) >> 16) + ((((b >> 16) & 0xffff) * f1) >> 16)) << 16)
+      + ((((((a >> 32) & 0xffff) * f0) >> 16) + ((((b >> 32) & 0xffff) * f1) >> 16)) << 32)
+      + ((((((a >> 48) & 0xffff) * f0) >> 16) + ((((b >> 48) & 0xffff) * f1) >> 16)) << 48);
+#endif
     }
 
   void set_mem_8(uint64_t* destination, uint64_t value, int count)
@@ -191,6 +179,25 @@ namespace
     while ((1 << p) < val)
       ++p;
     return p;
+    }
+
+  uint32_t positive_modulo(int32_t value, uint32_t m)
+    {
+    int32_t mod = value % m;
+    return mod < 0 ? mod + m : mod;
+    }
+
+  int32_t filterbump(uint16_t* s, int32_t pos, int32_t mod, int32_t step)
+    {
+    return s[positive_modulo(pos - step - step, mod)] * 1
+      + s[positive_modulo(pos - step, mod)] * 3
+      - s[positive_modulo(pos, mod)] * 3
+      - s[positive_modulo(pos + step, mod)] * 1;
+    }
+
+  int32_t filterbumpsharp(uint16_t* s, int32_t pos, int32_t mod, int32_t step)
+    {
+    return 4 * (s[positive_modulo(pos - step, mod)] - s[positive_modulo(pos, mod)]);
     }
 
   } // namespace
@@ -532,4 +539,235 @@ std::unique_ptr<image> image_perlin(int32_t xs, int32_t ys, int32_t freq, int32_
 void image_init()
   {
   init_perlin();
+  }
+
+std::unique_ptr<image> image_normals(const std::unique_ptr<image>& im, float _dist, int32_t mode)
+  {
+  int32_t shiftx, shifty;
+  int32_t xs, ys;
+  int32_t x, y;
+  uint16_t* sx, * sy, * s, * d;
+  int32_t vx, vy, vz;
+  float e;
+  int32_t dist;
+
+  std::unique_ptr<image> bm = std::make_unique<image>();
+  bm->init(im->width(), im->height());
+  dist = (int32_t)(_dist * 65536.0f);
+  d = (uint16_t*)bm->data();
+  sx = sy = s = (uint16_t*)im->data();
+  xs = im->width();
+  ys = im->height();
+  shiftx = get_power_2(im->width());
+  shifty = get_power_2(im->height());
+
+  for (y = 0; y < ys; y++)
+    {
+    sy = s;
+    for (x = 0; x < xs; x++)
+      {
+      if (mode & 4)
+        {
+        vx = filterbumpsharp(sx, x * 4, xs * 4, 4);
+        vy = filterbumpsharp(sy, y * xs * 4, ys * xs * 4, xs * 4);
+        }
+      else
+        {
+        vx = filterbump(sx, x * 4, xs * 4, 4);
+        vy = filterbump(sy, y * xs * 4, ys * xs * 4, xs * 4);
+        }
+      vx = range7fff((((vx) * (dist >> 4)) >> (20 - shiftx)) + 0x4000) - 0x4000;
+      vy = range7fff((((vy) * (dist >> 4)) >> (20 - shifty)) + 0x4000) - 0x4000;
+      vz = 0;
+
+      if (mode & 1)
+        {
+        vz = (0x3fff * 0x3fff) - vx * vx - vy * vy;
+        if (vz > 0)
+          {
+          vz = std::sqrt(vz);
+          }
+        else
+          {
+          e = 1.f / std::sqrt(vx * vx + vy * vy) * 0x3fff;
+          vx *= e;
+          vy *= e;
+          vz = 0;
+          }
+        }
+      if (mode & 2)
+        {
+        std::swap(vx, vy);
+        vy = -vy;
+        }
+
+      d[0] = vx + 0x4000;
+      d[1] = vy + 0x4000;
+      d[2] = vz + 0x4000;
+      d[3] = 0xffff;
+
+      d += 4;
+      sy += 4;
+      }
+    sx += xs * 4;
+    }
+  return bm;
+  }
+
+std::unique_ptr<image> image_gradient(int32_t xs, int32_t ys, uint32_t col0, uint32_t col1, float posf, float a, float length, int32_t mode)
+  {
+  if (xs < 1)
+    return nullptr;
+  if (ys < 1)
+    return nullptr;
+  std::unique_ptr<image> bm = std::make_unique<image>();
+  bm->init(xs, ys);
+
+  uint64_t c0, c1;
+  int32_t c, cdx, cdy, x, y;
+  int32_t dx, dy, pos;
+  float l;
+  int32_t val;
+  uint64_t* tile;
+
+  c0 = get_color_64(col0);
+  c1 = get_color_64(col1);
+
+  l = 32768.0f / length;
+  pos = posf * 32768.0f;
+  dx = (int32_t)(std::cos(a * 3.1415926535897f * 2.f) * l);
+  dy = (int32_t)(std::sin(a * 3.1415926535897f * 2.f) * l);
+  cdx = mul_shift(dx, 0x10000 / bm->width());
+  cdy = mul_shift(dy, 0x10000 / bm->height()) - bm->width() * cdx;
+
+  c = 0x4000 - (dx / 2 + dy / 2) * (posf + 1);
+
+  tile = bm->data();
+  for (y = 0; y < bm->height(); y++)
+    {
+    for (x = 0; x < bm->width(); x++)
+      {
+      switch (mode)
+        {
+        case 0:
+          val = range7fff(c) * 2;
+          break;
+        case 1:
+          val = (int32_t)(std::sin(range7fff(c) * 3.1415926535897f * 2.f / 0x8000 + 0x2000) * 0x7fff + 0x7fff);
+          break;
+        case 2:
+          val = (int32_t)(std::sin(range7fff(c) * 3.1415926535897f * 2.f / 0x10000) * 0xffff);
+          break;
+        }
+      fade_64(*tile, c0, c1, val);
+      c += cdx;
+      tile++;
+      }
+
+    c += cdy;
+    }
+
+  return bm;
+  }
+
+void image_glow_rect(std::unique_ptr<image>& im, float cx, float cy, float rx, float ry, float sx, float sy, uint32_t color, float alpha, float power, uint32_t wrap, uint32_t flags)
+  {
+  uint64_t* d;
+  int32_t x, y;
+  float a;
+  int32_t f, fm;
+  uint64_t col;
+  float fx, fy, thresh;
+  int32_t low_table[32];
+  bool circular = (flags & 2) == 0;
+
+  if (wrap == 1)
+    {
+    if (cx + rx + sx > 1.0f)
+      image_glow_rect(im, cx - 1.0f, cy, rx, ry, sx, sy, color, alpha, power, 2, flags);
+    if (cx - rx - sx < -0.0f)
+      image_glow_rect(im, cx + 1.0f, cy, rx, ry, sx, sy, color, alpha, power, 2, flags);
+    }
+  if (wrap == 1 || wrap == 2)
+    {
+    if (cy + ry + sy > 1.0f)
+      image_glow_rect(im, cx, cy - 1.0f, rx, ry, sx, sy, color, alpha, power, 0, flags);
+    if (cy - ry - sy < -0.0f)
+      image_glow_rect(im, cx, cy + 1.0f, rx, ry, sx, sy, color, alpha, power, 0, flags);
+    }
+
+  if (power == 0)
+    power = (1.0f / 65536.0f);
+  power = 0.25 / power;
+
+  cx *= im->width();
+  cy *= im->height();
+  rx *= im->width();
+  ry *= im->height();
+  sx *= im->width();
+  sy *= im->height();
+
+  int32_t icx = cx, icy = cy, isx = sx, isy = sy;
+
+  thresh = 1.0f / 65536.0f;
+  if (rx < thresh)
+    rx = thresh;
+  rx = circular ? 1.0f / (rx * rx) : 1.0f / rx;
+
+  if (ry < thresh)
+    ry = thresh;
+  ry = circular ? 1.0f / (ry * ry) : 1.0f / ry;
+
+  alpha *= 32768.0f;
+  col = get_color_64(color);
+  fm = alpha;
+  int32_t gamma_table[1025];
+
+  for (x = 0; x < 1025; ++x)
+    {
+    if (flags & 1)
+      gamma_table[x] = range7fff(std::pow(1.0f - x / 1024.0f, power) * alpha) * 2;
+    else
+      gamma_table[x] = range7fff((1.0f - std::pow(x / 1024.0f, power * 2.0f)) * alpha) * 2;
+    }
+
+  // there are very steep slopes around 0, so don't try approximating them
+  for (x = 0; x < 32; ++x)
+    {
+    if (flags & 1)
+      low_table[x] = range7fff(std::pow(1.0f - x / 32768.0f, power) * alpha) * 2;
+    else
+      low_table[x] = range7fff((1.0f - std::pow(x / 32768.0f, power * 2.0f)) * alpha) * 2;
+    }
+
+  d = im->data();
+
+  for (y = 0; y < im->height(); ++y)
+    {
+    fy = std::abs(y - cy) - sy;
+    if (fy < 0)
+      fy = 0;
+    fy *= circular ? fy * ry : ry;
+
+    for (x = 0; x < im->width(); ++x)
+      {
+      fx = std::abs(x - cx) - sx;
+      if (fx < 0)
+        fx = 0;
+
+      a = circular ? fx * fx * rx + fy : std::max(fx * rx, fy);
+      if (a < 1.0f - 1.0f / 32768.0f) // to cull a few more pixels...
+        {
+        f = (int32_t)(a * 32768);
+        if (f < 32)
+          f = low_table[f];
+        else
+          f = get_gamma(f, gamma_table);
+
+        fade_64(*d, *d, col, f);
+        }
+
+      ++d;
+      }
+    }
   }

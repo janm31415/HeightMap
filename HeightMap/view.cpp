@@ -109,7 +109,7 @@ void view::_imgui_ui()
       {
       _dirty = true;
       }
-    if (ImGui::InputInt("Mode", &_settings.mode))
+    if (ImGui::InputInt("Height mode", &_settings.mode))
       {
       _dirty = true;
       }
@@ -121,7 +121,78 @@ void view::_imgui_ui()
       {
       _dirty = true;
       }
+    if (ImGui::InputFloat("Normal strength", &_settings.normalmap_strength))
+      {
+      _dirty = true;
+      }
+    if (ImGui::InputInt("Normal mode", &_settings.normalmap_mode))
+      {
+      _dirty = true;
+      }
+
+    float island_center[2] = { _settings.island_center_x, _settings.island_center_y };
+    if (ImGui::InputFloat2("Island center", island_center))
+      {
+      _settings.island_center_x = island_center[0];
+      _settings.island_center_y = island_center[1];
+      _dirty = true;
+      }
+    float island_radius[2] = { _settings.island_radius_x, _settings.island_radius_y };
+    if (ImGui::InputFloat2("Island radius", island_radius))
+      {
+      _settings.island_radius_x = island_radius[0];
+      _settings.island_radius_y = island_radius[1];
+      _dirty = true;
+      }
+    float island_size[2] = { _settings.island_size_x, _settings.island_size_y };
+    if (ImGui::InputFloat2("Island size", island_size))
+      {
+      _settings.island_size_x = island_size[0];
+      _settings.island_size_y = island_size[1];
+      _dirty = true;
+      }
+    if (ImGui::InputFloat("Island blend", &_settings.island_blend))
+      {
+      _dirty = true;
+      }
+    if (ImGui::InputFloat("Island power", &_settings.island_power))
+      {
+      _dirty = true;
+      }
+    if (ImGui::InputInt("Island wrap", &_settings.island_wrap))
+      {
+      _dirty = true;
+      }
+    if (ImGui::InputInt("Island flags", &_settings.island_flags))
+      {
+      _dirty = true;
+      }
+
+    if (ImGui::Button("Heightmap"))
+      {
+      _settings.render_target = 0;
+      _dirty = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Normalmap"))
+      {
+      _settings.render_target = 1;
+      _dirty = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Colormap"))
+      {
+      _settings.render_target = 2;
+      _dirty = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Island gradient"))
+      {
+      _settings.render_target = 3;
+      _dirty = true;
+      }
     }
+
   ImGui::End();
 
   //ImGui::ShowDemoWindow();
@@ -132,15 +203,46 @@ void view::_check_image()
   {
   if (!_dirty)
     return;
-  bool _reallocate_sdl_surface = (_settings.width != _heightmap->width() || _settings.height != _heightmap->height());  
+  bool _reallocate_sdl_surface = (_settings.width != _heightmap->width() || _settings.height != _heightmap->height());
   _heightmap = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff, _settings.seed, _settings.mode, _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);
-
+  _normalmap = image_normals(_heightmap, _settings.normalmap_strength, _settings.normalmap_mode);
+  _islandgradient = image_flat(_settings.width, _settings.height, 0xff000000);
+  image_glow_rect(_islandgradient,
+    _settings.island_center_x,
+    _settings.island_center_y,
+    _settings.island_radius_x,
+    _settings.island_radius_y,
+    _settings.island_size_x,
+    _settings.island_size_y,
+    0xffffffff,
+    _settings.island_blend,
+    _settings.island_power,
+    _settings.island_wrap,
+    _settings.island_flags);
+  _colormap = _heightmap->copy();
   if (_reallocate_sdl_surface)
     {
     SDL_FreeSurface(_heightmap_surface);
     _heightmap_surface = create_sdl_surface(_heightmap);
     }
-  fill_sdl_surface(_heightmap_surface, _heightmap);
+  switch (_settings.render_target)
+    {
+    case 0:
+      fill_sdl_surface(_heightmap_surface, _heightmap);
+      break;
+    case 1:
+      fill_sdl_surface(_heightmap_surface, _normalmap);
+      break;
+    case 2:
+      fill_sdl_surface(_heightmap_surface, _colormap);
+      break;
+    case 3:
+      fill_sdl_surface(_heightmap_surface, _islandgradient);
+      break;
+    default:
+      fill_sdl_surface(_heightmap_surface, _heightmap);
+      break;
+    }
   SDL_DestroyTexture(_heightmap_texture);
   _heightmap_texture = SDL_CreateTextureFromSurface(_renderer, _heightmap_surface);
   _dirty = false;

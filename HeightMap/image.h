@@ -57,3 +57,9 @@ std::unique_ptr<image> image_flat(int32_t width, int32_t height, uint32_t color)
 bool fill_rgba_buffer_with_image(void* buffer, uint32_t buffer_bytes_per_row, const std::unique_ptr<image>& im);
 
 std::unique_ptr<image> image_perlin(int32_t xs, int32_t ys, int32_t freq, int32_t oct, float fadeoff, int32_t seed, int32_t mode, float amp, float gamma, uint32_t col0, uint32_t col1);
+
+std::unique_ptr<image> image_normals(const std::unique_ptr<image>& im, float dist, int32_t mode);
+
+std::unique_ptr<image> image_gradient(int32_t xs, int32_t ys, uint32_t col0, uint32_t col1, float pos, float angle, float length, int32_t mode);
+
+void image_glow_rect(std::unique_ptr<image>& im, float cx, float cy, float rx, float ry, float sx, float sy, uint32_t color, float alpha, float power, uint32_t wrap, uint32_t flags);
