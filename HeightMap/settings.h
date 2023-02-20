@@ -21,6 +21,7 @@ struct settings
   int32_t normalmap_mode;
   float normalmap_strength;
   
+  bool make_island;
   float island_center_x;
   float island_center_y;
   float island_radius_x;

@@ -16,16 +16,18 @@ settings::settings()
   normalmap_strength = 1.f;
   render_target = 0;
 
+  make_island = false;
+
   island_center_x = 0.5f;
   island_center_y = 0.5f;
-  island_radius_x = 0.25f;
-  island_radius_y = 0.25f;
+  island_radius_x = 0.5f;
+  island_radius_y = 0.5f;
   island_size_x = 0.f;
   island_size_y = 0.f;
   island_blend = 1.f;
-  island_power = 0.5f;
+  island_power = 0.1f;
   island_wrap = 0;
-  island_flags = 0;
+  island_flags = 1;
   }
 
 
@@ -56,6 +58,7 @@ settings read_settings(const char* filename)
   f["island_power"] >> s.island_power;
   f["island_wrap"] >> s.island_wrap;
   f["island_flags"] >> s.island_flags;
+  f["make_island"] >> s.make_island;
   return s;
   }
 
@@ -85,6 +88,7 @@ void write_settings(const settings& s, const char* filename)
   f << "island_power" << s.island_power;
   f << "island_wrap" << s.island_wrap;
   f << "island_flags" << s.island_flags;
+  f << "make_island" << s.make_island;
 
   f.release();
   }

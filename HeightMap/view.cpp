@@ -130,6 +130,10 @@ void view::_imgui_ui()
       _dirty = true;
       }
 
+    if (ImGui::Checkbox("Make island", &_settings.make_island))
+      {
+      _dirty = true;
+      }
     float island_center[2] = { _settings.island_center_x, _settings.island_center_y };
     if (ImGui::InputFloat2("Island center", island_center))
       {
@@ -204,8 +208,7 @@ void view::_check_image()
   if (!_dirty)
     return;
   bool _reallocate_sdl_surface = (_settings.width != _heightmap->width() || _settings.height != _heightmap->height());
-  _heightmap = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff, _settings.seed, _settings.mode, _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);
-  _normalmap = image_normals(_heightmap, _settings.normalmap_strength, _settings.normalmap_mode);
+  _heightmap = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff, _settings.seed, _settings.mode, _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);  
   _islandgradient = image_flat(_settings.width, _settings.height, 0xff000000);
   image_glow_rect(_islandgradient,
     _settings.island_center_x,
@@ -220,6 +223,10 @@ void view::_check_image()
     _settings.island_wrap,
     _settings.island_flags);
   _colormap = _heightmap->copy();
+  if (_settings.make_island)
+    _heightmap = image_merge(2, 2, &_heightmap, &_islandgradient);
+  _normalmap = image_normals(_heightmap, _settings.normalmap_strength, _settings.normalmap_mode);
+
   if (_reallocate_sdl_surface)
     {
     SDL_FreeSurface(_heightmap_surface);

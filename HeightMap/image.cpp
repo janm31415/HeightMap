@@ -200,6 +200,70 @@ namespace
     return 4 * (s[positive_modulo(pos - step, mod)] - s[positive_modulo(pos, mod)]);
     }
 
+  enum e_merge_mode
+    {
+    MERGEMODE_ADD,
+    MERGEMODE_SUB,
+    MERGEMODE_MUL
+    };
+
+  void image_inner(uint64_t* d, uint64_t* s, int32_t count, int32_t mode)
+    {
+    for (uint32_t i = 0; i < count; ++i)
+      {
+      switch (mode)
+        {
+        case MERGEMODE_ADD:
+        {
+        uint16_t* d16 = (uint16_t*)d;
+        uint16_t* s16 = (uint16_t*)s;
+        *d16++ += *s16++;
+        *d16++ += *s16++;
+        *d16++ += *s16++;
+        *d16++ += *s16++;
+        ++d;
+        ++s;
+        break;
+        }
+        case MERGEMODE_SUB:
+        {
+        uint16_t* d16 = (uint16_t*)d;
+        uint16_t* s16 = (uint16_t*)s;
+        *d16++ -= *s16++;
+        *d16++ -= *s16++;
+        *d16++ -= *s16++;
+        *d16++ -= *s16++;
+        ++d;
+        ++s;
+        break;
+        }
+        case MERGEMODE_MUL:
+        {
+        uint16_t* d16 = (uint16_t*)d;
+        uint16_t* s16 = (uint16_t*)s;
+        uint32_t res;
+        res = (uint32_t)(*d16) * (uint32_t)(*s16++);
+        *d16++ = res >> 15;
+        res = (uint32_t)(*d16) * (uint32_t)(*s16++);
+        *d16++ = res >> 15;
+        res = (uint32_t)(*d16) * (uint32_t)(*s16++);
+        *d16++ = res >> 15;
+        res = (uint32_t)(*d16) * (uint32_t)(*s16++);
+        *d16++ = res >> 15;
+
+        ++d;
+        ++s;
+        break;
+        }
+        default:
+        {
+        *d++ = *s++;
+        break;
+        }
+        }
+      }
+    }
+
   } // namespace
 
 image::image() : _data(nullptr), _width(0), _height(0), _size(0), _format(image_format::rgba16)
@@ -770,4 +834,36 @@ void image_glow_rect(std::unique_ptr<image>& im, float cx, float cy, float rx, f
       ++d;
       }
     }
+  }
+
+std::unique_ptr<image> image_merge(int32_t mode, int32_t count, const std::unique_ptr<image>* i0, ...)
+  {
+  if (i0 == nullptr)
+    return nullptr;
+  va_list args;
+  va_start(args, i0);
+  const std::unique_ptr<image>* ii;
+  int i;
+  for (i = 1; i < count; ++i)
+    {
+    ii = va_arg(args, const std::unique_ptr<image>*);
+    if (ii == nullptr)
+      return nullptr;
+    if ((*i0)->width() != (*ii)->width() || (*i0)->height() != (*ii)->height())
+      return nullptr;
+    }
+  va_end(args);
+
+  std::unique_ptr<image> im_out = (*i0)->copy();
+
+  va_start(args, i0);
+  i = 1;
+  while (i < count)
+    {
+    ii = va_arg(args, const std::unique_ptr<image>*);
+    image_inner(im_out->data(), (*ii)->data(), im_out->size(), mode);
+    ++i;
+    }
+  va_end(args);
+  return im_out;
   }
