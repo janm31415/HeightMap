@@ -2,6 +2,9 @@
 
 #include "SDL.h"
 
+#include "image.h"
+#include "settings.h"
+
 class view
   {
   public:
@@ -13,10 +16,17 @@ class view
   private:
 
     void _poll_for_events();
+    void _imgui_ui();    
+    void _check_image();
 
   private:
     uint32_t _w, _h;
     SDL_Window* _window;
     SDL_Renderer* _renderer;
+    SDL_Surface* _heightmap_surface;
+    SDL_Texture* _heightmap_texture;
     bool _quit;
+    std::unique_ptr<image> _heightmap;    
+    settings _settings;
+    bool _dirty;
   };

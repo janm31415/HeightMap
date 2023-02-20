@@ -18,11 +18,17 @@ ${CMAKE_CURRENT_SOURCE_DIR}/../imgui_sdl/imgui_widgets.cpp
 )
 
 set(HDRS
+image.h
+pref_file.h
+settings.h
 view.h
     )
 	
 set(SRCS
+image.cpp
 main.cpp
+pref_file.cpp
+settings.cpp
 view.cpp
 )
 
