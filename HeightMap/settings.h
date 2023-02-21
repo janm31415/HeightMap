@@ -32,6 +32,8 @@ struct settings
   float island_power;
   int32_t island_wrap;
   int32_t island_flags;
+  int32_t island_merge_mode;
+  bool island_invert;
 
   int32_t render_target;
 

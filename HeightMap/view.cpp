@@ -54,15 +54,16 @@ namespace
     clrs.emplace_back(224, 224, 0, 255, 0.4750); // dirt
     clrs.emplace_back(128, 128, 128, 255, 0.75); // rock
     clrs.emplace_back(255, 255, 255, 255, 1.0); // snow
-    std::sort(clrs.begin(), clrs.end(), [](const auto& left, const auto& right)
-      {
-      return left.height < right.height;
-      });
     return clrs;
     }
 
-  std::unique_ptr<image> image_height_to_color(const std::unique_ptr<image>& im_height, const std::vector<map_color>& colors)
+  std::unique_ptr<image> image_height_to_color(const std::unique_ptr<image>& im_height, std::vector<map_color> colors)
     {
+    std::sort(colors.begin(), colors.end(), [](const auto& left, const auto& right)
+      {
+      return left.height < right.height;
+      });
+
     std::unique_ptr<image> im_out = std::make_unique<image>();
     im_out->init(im_height->width(), im_height->height());
 
@@ -94,9 +95,9 @@ namespace
         uint32_t blend_color_1 = colors[k - 1].clr;
         uint32_t blend_color_2 = colors[k].clr;
         rgba c1(blend_color_1);
-        rgba c2(blend_color_2);        
-        double alpha = (scale - colors[k - 1].height) / (colors[k].height - colors[k-1].height);
-        rgba c3 = c1*(1-alpha) + c2 * alpha;
+        rgba c2(blend_color_2);
+        double alpha = (scale - colors[k - 1].height) / (colors[k].height - colors[k - 1].height);
+        rgba c3 = c1 * (1 - alpha) + c2 * alpha;
         *dest = get_color_64(c3.color());
         }
       ++height;
@@ -254,26 +255,16 @@ void view::_imgui_ui()
       {
       _dirty = true;
       }
-
-    static bool open_export_folder = false;
-    if (ImGui::Button("...##1"))
+    if (ImGui::InputInt("Island merge mode", &_settings.island_merge_mode))
       {
-      open_export_folder = true;
+      _dirty = true;
       }
-    ImGui::SameLine();
-    static char export_folder[1024];
-    for (size_t i = 0; i <= _settings.export_folder.length(); ++i)
-      export_folder[i] = _settings.export_folder[i];
-    ImGui::InputText("Export folder", export_folder, IM_ARRAYSIZE(export_folder));
-    _settings.export_folder = std::string(export_folder);
-
-    static ImGuiFs::Dialog open_export_folder_dlg(false, true, true);
-    const char* openExportFolderChosenPath = open_export_folder_dlg.chooseFolderDialog(open_export_folder, _settings.export_folder.c_str(), "Open export folder", ImVec2(-1, -1), ImVec2(50, 50));
-    open_export_folder = false;
-    if (strlen(openExportFolderChosenPath) > 0)
+    if (ImGui::Checkbox("Island invert", &_settings.island_invert))
       {
-      _settings.export_folder = open_export_folder_dlg.getLastDirectory();
+      _dirty = true;
       }
+
+    ImGui::Dummy(ImVec2(0.0f, 20.0f));
 
     if (ImGui::Button("Heightmap"))
       {
@@ -298,10 +289,63 @@ void view::_imgui_ui()
       _settings.render_target = 3;
       _dirty = true;
       }
-    if (ImGui::Button("Export"))
+
+    ImGui::Dummy(ImVec2(0.0f, 20.0f));
+
+    static bool open_export_settings_file = false;
+    static bool open_import_settings_file = false;
+    if (ImGui::Button("Export settings"))
+      {
+      open_export_settings_file = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Import settings"))
+      {
+      open_import_settings_file = true;
+      }
+
+    ImGui::Dummy(ImVec2(0.0f, 20.0f));
+    static bool open_export_folder = false;
+    if (ImGui::Button("...##1"))
+      {
+      open_export_folder = true;
+      }
+    ImGui::SameLine();
+    static char export_folder[1024];
+    for (size_t i = 0; i <= _settings.export_folder.length(); ++i)
+      export_folder[i] = _settings.export_folder[i];
+    ImGui::InputText("Export folder", export_folder, IM_ARRAYSIZE(export_folder));
+    _settings.export_folder = std::string(export_folder);
+    if (ImGui::Button("Export images"))
       {
       _export_images();
       }
+
+    static ImGuiFs::Dialog open_export_folder_dlg(false, true, true);
+    const char* openExportFolderChosenPath = open_export_folder_dlg.chooseFolderDialog(open_export_folder, _settings.export_folder.c_str(), "Open export folder", ImVec2(-1, -1), ImVec2(50, 50));
+    open_export_folder = false;
+    if (strlen(openExportFolderChosenPath) > 0)
+      {
+      _settings.export_folder = open_export_folder_dlg.getLastDirectory();
+      }
+
+    static ImGuiFs::Dialog open_export_settings_dlg(false, true, true);
+    const char* openExportSettingsChosenPath = open_export_settings_dlg.saveFileDialog(open_export_settings_file, _settings.export_folder.c_str(), 0, ".json", "Export settings", ImVec2(-1, -1), ImVec2(50, 50));
+    open_export_settings_file = false;
+    if (strlen(openExportSettingsChosenPath) > 0)
+      {
+      write_settings(_settings, open_export_settings_dlg.getChosenPath());
+      }
+
+    static ImGuiFs::Dialog open_import_settings_dlg(false, true, true);
+    const char* openImportSettingsChosenPath = open_import_settings_dlg.chooseFileDialog(open_import_settings_file, _settings.export_folder.c_str(), ".json", "Import settings", ImVec2(-1, -1), ImVec2(50, 50));
+    open_import_settings_file = false;
+    if (strlen(openImportSettingsChosenPath) > 0)
+      {
+      _settings = read_settings(open_import_settings_dlg.getChosenPath());
+      _dirty = true;
+      }
+
     }
 
   ImGui::End();
@@ -339,8 +383,37 @@ void view::_check_image()
     _settings.island_power,
     _settings.island_wrap,
     _settings.island_flags);
+
+  if (_settings.island_invert)
+    {
+    image_color(_islandgradient, 0, 0x00ffffff);
+    image_color(_islandgradient, 4, 0x00ffffff);
+    }
   if (_settings.make_island)
-    _heightmap = image_merge(2, 2, &_heightmap, &_islandgradient);
+    {
+    
+    switch (_settings.island_merge_mode)
+      {
+      case 1: // sub
+      {
+      std::unique_ptr<image> grad = _islandgradient->copy();
+      image_color(grad, 0, 0x00ffffff);
+      grad = image_merge(3, 2, &_heightmap, &grad); // min
+      _heightmap = image_merge(_settings.island_merge_mode, 2, &_heightmap, &grad);
+      break;
+      }
+      default:
+      {
+      std::unique_ptr<image> grad = _islandgradient->copy();
+      image_color(grad, 0, 0x00ffffff);
+      _heightmap = image_merge(_settings.island_merge_mode, 2, &_heightmap, &grad);
+      break;
+      }
+      case 2: // MUL
+        _heightmap = image_merge(_settings.island_merge_mode, 2, &_heightmap, &_islandgradient);
+        break;
+      }
+    }
   _normalmap = image_normals(_heightmap, _settings.normalmap_strength, _settings.normalmap_mode);
 
   std::vector<map_color> colors = build_map_colors();

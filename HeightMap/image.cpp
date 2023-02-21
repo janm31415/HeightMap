@@ -204,7 +204,15 @@ namespace
     {
     MERGEMODE_ADD,
     MERGEMODE_SUB,
-    MERGEMODE_MUL
+    MERGEMODE_MUL,
+    MERGEMODE_MIN,
+    MERGEMODE_MAX,
+    MERGEMODE_COLOR_MODES,
+    MERGEMODE_COLOR_MUL,
+    MERGEMODE_COLOR_ADD,
+    MERGEMODE_COLOR_SUB,
+    MERGEMODE_COLOR_GRAY,
+    MERGEMODE_COLOR_INVERT
     };
 
   void image_inner(uint64_t* d, uint64_t* s, int32_t count, int32_t mode)
@@ -250,9 +258,91 @@ namespace
         *d16++ = res >> 15;
         res = (uint32_t)(*d16) * (uint32_t)(*s16++);
         *d16++ = res >> 15;
-
         ++d;
         ++s;
+        break;
+        }
+        case MERGEMODE_MIN:
+        {
+        uint16_t* d16 = (uint16_t*)d;
+        uint16_t* s16 = (uint16_t*)s;
+        *d16 = *s16 < *d16 ? *s16 : *d16;
+        ++d16; ++s16;
+        *d16 = *s16 < *d16 ? *s16 : *d16;
+        ++d16; ++s16;
+        *d16 = *s16 < *d16 ? *s16 : *d16;
+        ++d16; ++s16;
+        *d16 = *s16 < *d16 ? *s16 : *d16;        
+        ++d;
+        ++s;
+        break;
+        }
+        case MERGEMODE_MAX:
+        {
+        uint16_t* d16 = (uint16_t*)d;
+        uint16_t* s16 = (uint16_t*)s;
+        *d16 = *s16 > *d16 ? *s16 : *d16;
+        ++d16; ++s16;
+        *d16 = *s16 > *d16 ? *s16 : *d16;
+        ++d16; ++s16;
+        *d16 = *s16 > *d16 ? *s16 : *d16;
+        ++d16; ++s16;
+        *d16 = *s16 > *d16 ? *s16 : *d16;
+        ++d;
+        ++s;
+        break;
+        }
+        case MERGEMODE_COLOR_ADD:
+        {
+        uint16_t* d16 = (uint16_t*)d;
+        uint16_t* s16 = (uint16_t*)s;
+        *d16++ += *s16++;
+        *d16++ += *s16++;
+        *d16++ += *s16++;
+        *d16++ += *s16++;
+        ++d;
+        break;
+        }
+        case MERGEMODE_COLOR_SUB:
+        {
+        uint16_t* d16 = (uint16_t*)d;
+        uint16_t* s16 = (uint16_t*)s;
+        *d16++ -= *s16++;
+        *d16++ -= *s16++;
+        *d16++ -= *s16++;
+        *d16++ -= *s16++;
+        ++d;
+        break;
+        }
+        case MERGEMODE_COLOR_MUL:
+        {
+        uint16_t* d16 = (uint16_t*)d;
+        uint16_t* s16 = (uint16_t*)s;
+        uint32_t res;
+        res = (uint32_t)(*d16) * (uint32_t)(*s16++);
+        *d16++ = res >> 15;
+        res = (uint32_t)(*d16) * (uint32_t)(*s16++);
+        *d16++ = res >> 15;
+        res = (uint32_t)(*d16) * (uint32_t)(*s16++);
+        *d16++ = res >> 15;
+        res = (uint32_t)(*d16) * (uint32_t)(*s16++);
+        *d16++ = res >> 15;
+        ++d;
+        break;
+        }
+        case MERGEMODE_COLOR_GRAY:
+        {        
+        uint64_t blue = (*s >> 32) && 0xffff;
+        uint64_t green = (*s >> 16) && 0xffff;
+        uint64_t red = (*s) && 0xffff;
+        uint64_t gray = (blue + green + red)/3;
+        *d++ = 0xffff000000000000 | (gray << 32) | (gray << 16) | gray;
+        break;
+        }
+        case MERGEMODE_COLOR_INVERT:
+        {
+        *d ^= 0x7fff7fff7fff7fff;
+        ++d;
         break;
         }
         default:
@@ -866,4 +956,11 @@ std::unique_ptr<image> image_merge(int32_t mode, int32_t count, const std::uniqu
     }
   va_end(args);
   return im_out;
+  }
+
+void image_color(std::unique_ptr<image>& im, int32_t mode, uint32_t color)
+  {
+  int32_t inner_mode = mode + MERGEMODE_COLOR_MODES + 1;
+  uint64_t color64 = get_color_64(color);
+  image_inner(im->data(), &color64, im->size(), mode + MERGEMODE_COLOR_MODES + 1);
   }

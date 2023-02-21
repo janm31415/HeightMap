@@ -67,3 +67,5 @@ std::unique_ptr<image> image_gradient(int32_t xs, int32_t ys, uint32_t col0, uin
 void image_glow_rect(std::unique_ptr<image>& im, float cx, float cy, float rx, float ry, float sx, float sy, uint32_t color, float alpha, float power, uint32_t wrap, uint32_t flags);
 
 std::unique_ptr<image> image_merge(int32_t mode, int32_t count, const std::unique_ptr<image>* i0, ...);
+
+void image_color(std::unique_ptr<image>& im, int32_t mode, uint32_t color);

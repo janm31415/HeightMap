@@ -28,6 +28,8 @@ settings::settings()
   island_power = 0.1f;
   island_wrap = 0;
   island_flags = 1;
+  island_merge_mode = 2;
+  island_invert = false;
   }
 
 
@@ -59,6 +61,8 @@ settings read_settings(const char* filename)
   f["island_wrap"] >> s.island_wrap;
   f["island_flags"] >> s.island_flags;
   f["make_island"] >> s.make_island;
+  f["island_merge_mode"] >> s.island_merge_mode;
+  f["island_invert"] >> s.island_invert;
 
   f["export_folder"] >> s.export_folder;
   return s;
@@ -91,6 +95,8 @@ void write_settings(const settings& s, const char* filename)
   f << "island_wrap" << s.island_wrap;
   f << "island_flags" << s.island_flags;
   f << "make_island" << s.make_island;
+  f << "island_merge_mode" << s.island_merge_mode;
+  f << "island_invert" << s.island_invert;
 
   f << "export_folder" << s.export_folder;
 
