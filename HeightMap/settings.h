@@ -38,6 +38,9 @@ struct settings
   int32_t render_target;
 
   std::string export_folder;
+
+  std::vector<uint32_t> colors;
+  std::vector<double> heights;
   };
 
 

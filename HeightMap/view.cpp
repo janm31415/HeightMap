@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <stdexcept>
 #include <vector>
+#include <sstream>
+#include <numeric>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -17,6 +19,55 @@
 
 namespace
   {
+  template <typename T, typename Compare>
+  std::vector<std::size_t> sort_permutation(const std::vector<T>& vec, Compare& compare)
+    {
+    std::vector<std::size_t> p(vec.size());
+    std::iota(p.begin(), p.end(), 0);
+    std::sort(p.begin(), p.end(),
+      [&](std::size_t i, std::size_t j) { return compare(vec[i], vec[j]); });
+    return p;
+    }
+
+  template <typename T>
+  std::vector<T> apply_permutation(const std::vector<T>& vec, const std::vector<std::size_t>& p)
+    {
+    std::vector<T> sorted_vec(vec.size());
+    std::transform(p.begin(), p.end(), sorted_vec.begin(),
+      [&](std::size_t i) { return vec[i]; });
+    return sorted_vec;
+    }
+
+  template <class TType>
+  void delete_items(std::vector<TType>& vec, const std::vector<uint32_t>& _indices_to_delete)
+    {
+    if (_indices_to_delete.empty() || vec.empty())
+      return;
+    std::vector<uint32_t> indices_to_delete(_indices_to_delete);
+    assert(vec.size() > *std::max_element(indices_to_delete.begin(), indices_to_delete.end()));
+    std::sort(indices_to_delete.begin(), indices_to_delete.end());
+    indices_to_delete.erase(std::unique(indices_to_delete.begin(), indices_to_delete.end()), indices_to_delete.end());
+
+    if (indices_to_delete.size() == vec.size())
+      {
+      vec.clear();
+      return;
+      }
+
+    auto last = --vec.end();
+
+    for (auto rit = indices_to_delete.rbegin(); rit != indices_to_delete.rend(); ++rit)
+      {
+      size_t index = *rit;
+      auto it = vec.begin() + index;
+      if (it != last)
+        {
+        std::swap(*it, *last);
+        }
+      --last;
+      }
+    vec.erase(++last, vec.end());
+    }
 
   SDL_Surface* create_sdl_surface(const std::unique_ptr<image>& im)
     {
@@ -39,26 +90,35 @@ namespace
       {
       clr = ((uint32_t)a) << 24 | ((uint32_t)b) << 16 | ((uint32_t)g) << 8 | ((uint32_t)r);
       }
+    map_color(uint32_t c, double h) : clr(c), height(h) {}
+
     uint32_t clr;
     double height;
     };
 
-  std::vector<map_color> build_map_colors()
+  std::vector<map_color> build_map_colors(const std::vector<uint32_t>& colors, const std::vector<double>& heights)
     {
     std::vector<map_color> clrs;
-    clrs.emplace_back(0, 0, 128, 0, 0.0); // deeps
-    clrs.emplace_back(0, 0, 255, 255, 0.05); // shallow
-    clrs.emplace_back(0, 128, 255, 255, 0.1); // shore
-    clrs.emplace_back(240, 240, 64, 255, 0.1625); // sand
-    clrs.emplace_back(32, 160, 0, 255, 0.250); // grass
-    clrs.emplace_back(224, 224, 0, 255, 0.4750); // dirt
-    clrs.emplace_back(128, 128, 128, 255, 0.75); // rock
-    clrs.emplace_back(255, 255, 255, 255, 1.0); // snow
+    uint32_t sz = (uint32_t)colors.size();
+    if (heights.size() < sz)
+      sz = (uint32_t)heights.size();
+    for (uint32_t i = 0; i < sz; ++i)
+      clrs.emplace_back(colors[i], heights[i]);
+
     return clrs;
     }
 
   std::unique_ptr<image> image_height_to_color(const std::unique_ptr<image>& im_height, std::vector<map_color> colors)
     {
+    if (colors.empty())
+      {
+      return image_flat(im_height->width(), im_height->height(), 0xff000000);
+      }
+    if (colors.size() == 1)
+      {
+      return image_flat(im_height->width(), im_height->height(), colors.front().clr);
+      }
+
     std::sort(colors.begin(), colors.end(), [](const auto& left, const auto& right)
       {
       return left.height < right.height;
@@ -107,6 +167,28 @@ namespace
     return im_out;
     }
 
+  void make_color_set1(settings& s)
+    {
+    s.heights.clear();
+    s.colors.clear();
+    s.heights.push_back(0.0);
+    s.heights.push_back(0.05);
+    s.heights.push_back(0.1);
+    s.heights.push_back(0.1625);
+    s.heights.push_back(0.250);
+    s.heights.push_back(0.4750);
+    s.heights.push_back(0.75);
+    s.heights.push_back(1.0);
+    s.colors.push_back(0x00800000);
+    s.colors.push_back(0xffff0000);
+    s.colors.push_back(0xffff8000);
+    s.colors.push_back(0xff408c8c);
+    s.colors.push_back(0xff00a020);
+    s.colors.push_back(0xff00e0e0);
+    s.colors.push_back(0xff808080);
+    s.colors.push_back(0xffffffff);
+    }
+
   }
 
 view::view() : _w(1600), _h(900), _quit(false)
@@ -134,11 +216,16 @@ view::view() : _w(1600), _h(900), _quit(false)
   ImGui::GetStyle().Colors[ImGuiCol_TitleBg] = ImGui::GetStyle().Colors[ImGuiCol_TitleBgActive];
 
   _settings = read_settings("heightmapsettings.json");
-
   _heightmap = image_flat(_settings.width, _settings.height, 0xff00ff00);
   _heightmap_surface = create_sdl_surface(_heightmap);
   fill_sdl_surface(_heightmap_surface, _heightmap);
   _heightmap_texture = SDL_CreateTextureFromSurface(_renderer, _heightmap_surface);
+
+  if (_settings.colors.empty() || _settings.heights.empty())
+    {
+    make_color_set1(_settings);
+    }
+
   _dirty = true;
   }
 
@@ -161,14 +248,15 @@ void view::_imgui_ui()
   ImGui_ImplSDL2_NewFrame(_window);
   ImGui::NewFrame();
 
-  ImGui::SetNextWindowSize(ImVec2((float)(_w - 950), (float)(800)), ImGuiCond_Always);
-  ImGui::SetNextWindowPos(ImVec2((float)(900), (float)(50)), ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2((float)(_w - 950), (float)(_h)), ImGuiCond_Always);
+  ImGui::SetNextWindowPos(ImVec2((float)(950), (float)(0)), ImGuiCond_Always);
 
-  if (ImGui::Begin("Parameters", 0, 0))
+  if (ImGui::Begin("Parameters", 0, ImGuiWindowFlags_NoDecoration))
     {
-
+    ImGui::BeginChild("Heightmap", ImVec2(0.0, 200.0f), true);
+    ImGui::BeginGroup();
     int size[2] = { (int)_settings.width, (int)_settings.height };
-    if (ImGui::InputInt2("Size", size))
+    if (ImGui::InputInt2("Heightmap size", size))
       {
       if (size[0] > 0 && size[1] > 0)
         {
@@ -177,54 +265,64 @@ void view::_imgui_ui()
         _dirty = true;
         }
       }
-    if (ImGui::InputInt("Frequency", &_settings.frequency))
+    if (ImGui::InputInt("Heightmap frequency", &_settings.frequency))
       {
       _dirty = true;
       }
-    if (ImGui::InputInt("Octaves", &_settings.octaves))
+    if (ImGui::InputInt("Heightmap octaves", &_settings.octaves))
       {
       _dirty = true;
       }
-    if (ImGui::SliderFloat("Fadeoff", &_settings.fadeoff, -1.5f, 1.5f))
+    if (ImGui::SliderFloat("Heightmap fadeoff", &_settings.fadeoff, -1.5f, 1.5f))
       {
       _dirty = true;
       }
-    if (ImGui::InputInt("Seed", &_settings.seed))
+    if (ImGui::InputInt("Heightmap seed", &_settings.seed))
       {
       _dirty = true;
       }
-    const char* height_mode[] = { "norm", "abs", "sin", "abs+sin"};    
-    if (ImGui::Combo("Height mode", &_settings.mode, height_mode, IM_ARRAYSIZE(height_mode)))
+    const char* height_mode[] = { "norm", "abs", "sin", "abs+sin" };
+    if (ImGui::Combo("Heightmap mode", &_settings.mode, height_mode, IM_ARRAYSIZE(height_mode)))
       {
       _dirty = true;
       }
-    //if (ImGui::InputFloat("Amplify", &_settings.amplify))
-    if (ImGui::SliderFloat("Amplify", &_settings.amplify, 0.f, 5.f))
+    if (ImGui::SliderFloat("Heightmap amplify", &_settings.amplify, 0.f, 5.f))
       {
       _dirty = true;
       }
-    //if (ImGui::InputFloat("Gamma", &_settings.gamma))
-    if (ImGui::SliderFloat("Gamma", &_settings.gamma, 0.f, 3.f))
+    if (ImGui::SliderFloat("Heightmap gamma", &_settings.gamma, 0.f, 3.f))
       {
       _dirty = true;
       }
-    //if (ImGui::InputFloat("Normal strength", &_settings.normalmap_strength))
-    if (ImGui::SliderFloat("Normal strength", &_settings.normalmap_strength, 0.f, 2.f))
+    ImGui::EndGroup();
+    ImGui::EndChild();
+
+    ImGui::BeginChild("Normalmap", ImVec2(0.0, 70.0f), true);
+    ImGui::BeginGroup();
+    if (ImGui::SliderFloat("Normalmap strength", &_settings.normalmap_strength, 0.f, 2.f))
       {
       _dirty = true;
       }
     const char* normal_mode[] = { "normal 2d", "normal 3d", "normal tangent 2d", "normal tangent 3d",  "extra sharp 2d", "extra sharp 3d", "extra sharp tangent 2d", "extra sharp tangent 3d" };
-    if (ImGui::Combo("Normal mode", &_settings.normalmap_mode, normal_mode, IM_ARRAYSIZE(normal_mode)))      
-      {          
+    if (ImGui::Combo("Normalmap mode", &_settings.normalmap_mode, normal_mode, IM_ARRAYSIZE(normal_mode)))
+      {
       _dirty = true;
       }
+    ImGui::EndGroup();
+    ImGui::EndChild();
 
+    ImGui::BeginChild("Island", ImVec2(0.0, 230.0f), true);
+    ImGui::BeginGroup();
     if (ImGui::Checkbox("Make island", &_settings.make_island))
       {
       _dirty = true;
       }
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Island invert", &_settings.island_invert))
+      {
+      _dirty = true;
+      }
     float island_center[2] = { _settings.island_center_x, _settings.island_center_y };
-    //if (ImGui::InputFloat2("Island center", island_center))
     if (ImGui::SliderFloat2("Island center", island_center, 0.f, 1.f))
       {
       _settings.island_center_x = island_center[0];
@@ -254,53 +352,93 @@ void view::_imgui_ui()
       _dirty = true;
       }
     const char* island_wrap[] = { "repeat", "on" };
-    if (ImGui::Combo("Island wrap", &_settings.island_wrap, island_wrap, IM_ARRAYSIZE(island_wrap)))    
+    if (ImGui::Combo("Island wrap", &_settings.island_wrap, island_wrap, IM_ARRAYSIZE(island_wrap)))
       {
       _dirty = true;
       }
     const char* island_flags[] = { "normal ellipse", "alternative ellipse", "normal rectangle", "alternative rectangle" };
-    if (ImGui::Combo("Island flags", &_settings.island_flags, island_flags, IM_ARRAYSIZE(island_flags)))    
+    if (ImGui::Combo("Island flags", &_settings.island_flags, island_flags, IM_ARRAYSIZE(island_flags)))
       {
       _dirty = true;
       }
     const char* island_merge_mode[] = { "add", "sub", "mul", "min", "max" };
-    if (ImGui::Combo("Island merge mode", &_settings.island_merge_mode, island_merge_mode, IM_ARRAYSIZE(island_merge_mode)))    
+    if (ImGui::Combo("Island merge mode", &_settings.island_merge_mode, island_merge_mode, IM_ARRAYSIZE(island_merge_mode)))
       {
       _dirty = true;
       }
-    if (ImGui::Checkbox("Island invert", &_settings.island_invert))
-      {
-      _dirty = true;
-      }
+    ImGui::EndGroup();
+    ImGui::EndChild();
+    ImGui::BeginChild("Colors", ImVec2(0.0, 270.0f), true);
+    ImGui::BeginGroup();
 
-    ImGui::Dummy(ImVec2(0.0f, 20.0f));
-
-    if (ImGui::Button("Heightmap"))
+    if (ImGui::Button("Add", ImVec2(ImGui::GetContentRegionAvail().x * 0.5, 0)))
       {
-      _settings.render_target = 0;
+      _settings.heights.push_back(0.0);
+      _settings.colors.push_back(0xff00ff00);
       _dirty = true;
       }
     ImGui::SameLine();
-    if (ImGui::Button("Normalmap"))
+    if (ImGui::Button("Sort", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
       {
-      _settings.render_target = 1;
-      _dirty = true;
-      }
-    ImGui::SameLine();
-    if (ImGui::Button("Colormap"))
-      {
-      _settings.render_target = 2;
-      _dirty = true;
-      }
-    ImGui::SameLine();
-    if (ImGui::Button("Island gradient"))
-      {
-      _settings.render_target = 3;
-      _dirty = true;
+      auto p = sort_permutation(_settings.heights, [](auto left, auto right) { return left < right; });
+      _settings.heights = apply_permutation(_settings.heights, p);
+      _settings.colors = apply_permutation(_settings.colors, p);
       }
 
-    ImGui::Dummy(ImVec2(0.0f, 20.0f));
+    uint32_t colors_size = (uint32_t)_settings.colors.size();
+    if (_settings.heights.size() < colors_size)
+      colors_size = (uint32_t)_settings.heights.size();
+    std::vector<uint32_t> points_to_delete;
+    for (uint32_t i = 0; i < colors_size; ++i)
+      {
+      ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+      std::stringstream str;
+      str << "##color_" << i;
+      float clr[4] = { (_settings.colors[i] & 255) / 255.f, ((_settings.colors[i] >> 8) & 255) / 255.f, ((_settings.colors[i] >> 16) & 255) / 255.f, ((_settings.colors[i] >> 24) & 255) / 255.f };
+      if (ImGui::ColorEdit4(str.str().c_str(), clr))
+        {
+        uint32_t red = (uint32_t)(clr[0] * 255.f);
+        uint32_t green = (uint32_t)(clr[1] * 255.f);
+        uint32_t blue = (uint32_t)(clr[2] * 255.f);
+        uint32_t alpha = (uint32_t)(clr[3] * 255.f);
+        _settings.colors[i] = alpha << 24 | blue << 16 | green <<  8 | red;
+        _dirty = true;
+        }
+      ImGui::PopItemWidth();
 
+      ImGui::SameLine();
+      ImGui::PushItemWidth(-30);
+      str.str("");
+      str.clear();
+      str << "##point_" << i;
+      float value = (float)_settings.heights[i];
+      if (ImGui::SliderFloat(str.str().c_str(), &value, 0.f, 1.f))
+        {
+        _settings.heights[i] = (double)value;
+        _dirty = true;
+        }
+      ImGui::PopItemWidth();
+      ImGui::SameLine();
+
+      str.str("");
+      str.clear();
+      str << "X##_" << i;
+      if (ImGui::Button(str.str().c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+        {
+        points_to_delete.push_back(i);
+        }
+      }
+    if (!points_to_delete.empty())
+      {
+      delete_items(_settings.colors, points_to_delete);
+      delete_items(_settings.heights, points_to_delete);
+      _dirty = true;
+      }    
+    ImGui::EndGroup();
+    ImGui::EndChild();
+
+    ImGui::BeginChild("ImportExport", ImVec2(0.0, 90.0f), true);
+    ImGui::BeginGroup();
     static bool open_export_settings_file = false;
     static bool open_import_settings_file = false;
     if (ImGui::Button("Export settings"))
@@ -312,8 +450,6 @@ void view::_imgui_ui()
       {
       open_import_settings_file = true;
       }
-
-    ImGui::Dummy(ImVec2(0.0f, 20.0f));
     static bool open_export_folder = false;
     if (ImGui::Button("...##1"))
       {
@@ -329,6 +465,8 @@ void view::_imgui_ui()
       {
       _export_images();
       }
+    ImGui::EndGroup();
+    ImGui::EndChild();
 
     static ImGuiFs::Dialog open_export_folder_dlg(false, true, true);
     const char* openExportFolderChosenPath = open_export_folder_dlg.chooseFolderDialog(open_export_folder, _settings.export_folder.c_str(), "Open export folder", ImVec2(-1, -1), ImVec2(50, 50));
@@ -357,6 +495,37 @@ void view::_imgui_ui()
 
     }
 
+  ImGui::End();
+
+  ImGui::SetNextWindowSize(ImVec2(800, 80), ImGuiCond_Always);
+  ImGui::SetNextWindowPos(ImVec2(50, 850), ImGuiCond_Always);
+
+  if (ImGui::Begin("Buttons", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground))
+    {
+    if (ImGui::Button("Height map"))
+      {
+      _settings.render_target = 0;
+      _dirty = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Normal map"))
+      {
+      _settings.render_target = 1;
+      _dirty = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Color map"))
+      {
+      _settings.render_target = 2;
+      _dirty = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Island gradient"))
+      {
+      _settings.render_target = 3;
+      _dirty = true;
+      }
+    }
   ImGui::End();
 
   //ImGui::ShowDemoWindow();
@@ -427,7 +596,7 @@ void view::_check_image()
     }
   _normalmap = image_normals(_heightmap, _settings.normalmap_strength, static_cast<image_normals_mode>(_settings.normalmap_mode));
 
-  std::vector<map_color> colors = build_map_colors();
+  std::vector<map_color> colors = build_map_colors(_settings.colors, _settings.heights);
   _colormap = image_height_to_color(_heightmap, colors);
   if (_reallocate_sdl_surface)
     {

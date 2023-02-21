@@ -15,7 +15,6 @@ settings::settings()
   normalmap_mode = 1;
   normalmap_strength = 1.f;
   render_target = 0;
-
   make_island = false;
 
   island_center_x = 0.5f;
@@ -63,8 +62,10 @@ settings read_settings(const char* filename)
   f["make_island"] >> s.make_island;
   f["island_merge_mode"] >> s.island_merge_mode;
   f["island_invert"] >> s.island_invert;
-
   f["export_folder"] >> s.export_folder;
+
+  f["colors"] >> s.colors;
+  f["heights"] >> s.heights;
   return s;
   }
 
@@ -99,6 +100,9 @@ void write_settings(const settings& s, const char* filename)
   f << "island_invert" << s.island_invert;
 
   f << "export_folder" << s.export_folder;
+
+  f << "colors" << s.colors;
+  f << "heights" << s.heights;
 
   f.release();
   }
