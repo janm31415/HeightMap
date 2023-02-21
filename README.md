@@ -1,5 +1,5 @@
 # HeightMap
-Generate heightmaps with perlin noise
+Generate heightmaps with Perlin noise
 
 ## Building
 
