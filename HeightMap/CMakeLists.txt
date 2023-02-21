@@ -44,8 +44,6 @@ set(CMAKE_C_FLAGS_RELEASE "/W4 /MP /GF /O2 /Ob2 /Oi /Ot /MD /Zi")
 set(CMAKE_CXX_FLAGS_RELEASE "/W4 /MP /GF /O2 /Ob2 /Oi /Ot /MD /Zi")
 endif(WIN32)
 
-include ("../jtk/jtk/jtk.cmake")
-
 # general build definitions
 add_definitions(-DNOMINMAX)
 add_definitions(-D_UNICODE)

@@ -16,7 +16,6 @@ set(CMAKE_C_FLAGS_RELEASE "/W4 /MP /GF /O2 /Ob2 /Oi /Ot /MD /Zi /DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "/W4 /MP /GF /O2 /Ob2 /Oi /Ot /MD /Zi /DNDEBUG")
 endif (WIN32)
 
-add_subdirectory(jtk)
 add_subdirectory(SDL2)
 add_subdirectory(HeightMap)
 
