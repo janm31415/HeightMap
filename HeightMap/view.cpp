@@ -185,7 +185,7 @@ void view::_imgui_ui()
       {
       _dirty = true;
       }
-    if (ImGui::InputFloat("Fadeoff", &_settings.fadeoff))
+    if (ImGui::SliderFloat("Fadeoff", &_settings.fadeoff, -1.5f, 1.5f))
       {
       _dirty = true;
       }
@@ -193,24 +193,29 @@ void view::_imgui_ui()
       {
       _dirty = true;
       }
-    if (ImGui::InputInt("Height mode", &_settings.mode))
+    const char* height_mode[] = { "norm", "abs", "sin", "abs+sin"};    
+    if (ImGui::Combo("Height mode", &_settings.mode, height_mode, IM_ARRAYSIZE(height_mode)))
       {
       _dirty = true;
       }
-    if (ImGui::InputFloat("Amplify", &_settings.amplify))
+    //if (ImGui::InputFloat("Amplify", &_settings.amplify))
+    if (ImGui::SliderFloat("Amplify", &_settings.amplify, 0.f, 5.f))
       {
       _dirty = true;
       }
-    if (ImGui::InputFloat("Gamma", &_settings.gamma))
+    //if (ImGui::InputFloat("Gamma", &_settings.gamma))
+    if (ImGui::SliderFloat("Gamma", &_settings.gamma, 0.f, 3.f))
       {
       _dirty = true;
       }
-    if (ImGui::InputFloat("Normal strength", &_settings.normalmap_strength))
+    //if (ImGui::InputFloat("Normal strength", &_settings.normalmap_strength))
+    if (ImGui::SliderFloat("Normal strength", &_settings.normalmap_strength, 0.f, 2.f))
       {
       _dirty = true;
       }
-    if (ImGui::InputInt("Normal mode", &_settings.normalmap_mode))
-      {
+    const char* normal_mode[] = { "normal 2d", "normal 3d", "normal tangent 2d", "normal tangent 3d",  "extra sharp 2d", "extra sharp 3d", "extra sharp tangent 2d", "extra sharp tangent 3d" };
+    if (ImGui::Combo("Normal mode", &_settings.normalmap_mode, normal_mode, IM_ARRAYSIZE(normal_mode)))      
+      {          
       _dirty = true;
       }
 
@@ -219,43 +224,47 @@ void view::_imgui_ui()
       _dirty = true;
       }
     float island_center[2] = { _settings.island_center_x, _settings.island_center_y };
-    if (ImGui::InputFloat2("Island center", island_center))
+    //if (ImGui::InputFloat2("Island center", island_center))
+    if (ImGui::SliderFloat2("Island center", island_center, 0.f, 1.f))
       {
       _settings.island_center_x = island_center[0];
       _settings.island_center_y = island_center[1];
       _dirty = true;
       }
     float island_radius[2] = { _settings.island_radius_x, _settings.island_radius_y };
-    if (ImGui::InputFloat2("Island radius", island_radius))
+    if (ImGui::SliderFloat2("Island radius", island_radius, 0.f, 1.f))
       {
       _settings.island_radius_x = island_radius[0];
       _settings.island_radius_y = island_radius[1];
       _dirty = true;
       }
     float island_size[2] = { _settings.island_size_x, _settings.island_size_y };
-    if (ImGui::InputFloat2("Island size", island_size))
+    if (ImGui::SliderFloat2("Island size", island_size, 0.f, 2.f))
       {
       _settings.island_size_x = island_size[0];
       _settings.island_size_y = island_size[1];
       _dirty = true;
       }
-    if (ImGui::InputFloat("Island blend", &_settings.island_blend))
+    if (ImGui::SliderFloat("Island blend", &_settings.island_blend, 0.f, 2.f))
       {
       _dirty = true;
       }
-    if (ImGui::InputFloat("Island power", &_settings.island_power))
+    if (ImGui::SliderFloat("Island power", &_settings.island_power, 0.f, 2.f))
       {
       _dirty = true;
       }
-    if (ImGui::InputInt("Island wrap", &_settings.island_wrap))
+    const char* island_wrap[] = { "repeat", "on" };
+    if (ImGui::Combo("Island wrap", &_settings.island_wrap, island_wrap, IM_ARRAYSIZE(island_wrap)))    
       {
       _dirty = true;
       }
-    if (ImGui::InputInt("Island flags", &_settings.island_flags))
+    const char* island_flags[] = { "normal ellipse", "alternative ellipse", "normal rectangle", "alternative rectangle" };
+    if (ImGui::Combo("Island flags", &_settings.island_flags, island_flags, IM_ARRAYSIZE(island_flags)))    
       {
       _dirty = true;
       }
-    if (ImGui::InputInt("Island merge mode", &_settings.island_merge_mode))
+    const char* island_merge_mode[] = { "add", "sub", "mul", "min", "max" };
+    if (ImGui::Combo("Island merge mode", &_settings.island_merge_mode, island_merge_mode, IM_ARRAYSIZE(island_merge_mode)))    
       {
       _dirty = true;
       }
