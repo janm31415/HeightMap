@@ -369,7 +369,7 @@ void view::_check_image()
   if (!_dirty)
     return;
   bool _reallocate_sdl_surface = (_settings.width != _heightmap->width() || _settings.height != _heightmap->height());
-  _heightmap = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff, _settings.seed, _settings.mode, _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);
+  _heightmap = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff, _settings.seed, static_cast<image_perlin_mode>(_settings.mode), _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);
   _islandgradient = image_flat(_settings.width, _settings.height, 0xff000000);
   image_glow_rect(_islandgradient,
     _settings.island_center_x,
@@ -381,40 +381,42 @@ void view::_check_image()
     0xffffffff,
     _settings.island_blend,
     _settings.island_power,
-    _settings.island_wrap,
-    _settings.island_flags);
+    static_cast<image_glow_rect_wrap>(_settings.island_wrap),
+    static_cast<image_glow_rect_flags>(_settings.island_flags));
 
   if (_settings.island_invert)
     {
-    image_color(_islandgradient, 0, 0x00ffffff);
-    image_color(_islandgradient, 4, 0x00ffffff);
+    image_color(_islandgradient, image_color_mode::mul, 0x00ffffff);
+    image_color(_islandgradient, image_color_mode::invert, 0);
     }
   if (_settings.make_island)
     {
-    
-    switch (_settings.island_merge_mode)
+    image_merge_mode mode = static_cast<image_merge_mode>(_settings.island_merge_mode);
+    switch (mode)
       {
-      case 1: // sub
+      case image_merge_mode::sub:
       {
       std::unique_ptr<image> grad = _islandgradient->copy();
-      image_color(grad, 0, 0x00ffffff);
-      grad = image_merge(3, 2, &_heightmap, &grad); // min
-      _heightmap = image_merge(_settings.island_merge_mode, 2, &_heightmap, &grad);
+      image_color(grad, image_color_mode::mul, 0x00ffffff);
+      grad = image_merge(image_merge_mode::min, 2, &_heightmap, &grad);
+      _heightmap = image_merge(mode, 2, &_heightmap, &grad);
+      break;
+      }
+      case image_merge_mode::mul:
+      {
+      _heightmap = image_merge(mode, 2, &_heightmap, &_islandgradient);
       break;
       }
       default:
       {
       std::unique_ptr<image> grad = _islandgradient->copy();
-      image_color(grad, 0, 0x00ffffff);
-      _heightmap = image_merge(_settings.island_merge_mode, 2, &_heightmap, &grad);
+      image_color(grad, image_color_mode::mul, 0x00ffffff);
+      _heightmap = image_merge(mode, 2, &_heightmap, &grad);
       break;
       }
-      case 2: // MUL
-        _heightmap = image_merge(_settings.island_merge_mode, 2, &_heightmap, &_islandgradient);
-        break;
       }
     }
-  _normalmap = image_normals(_heightmap, _settings.normalmap_strength, _settings.normalmap_mode);
+  _normalmap = image_normals(_heightmap, _settings.normalmap_strength, static_cast<image_normals_mode>(_settings.normalmap_mode));
 
   std::vector<map_color> colors = build_map_colors();
   _colormap = image_height_to_color(_heightmap, colors);

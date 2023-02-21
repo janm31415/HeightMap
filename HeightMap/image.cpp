@@ -553,7 +553,7 @@ bool fill_rgba_buffer_with_image(void* buffer, uint32_t buffer_bytes_per_row, co
   }
 
 
-std::unique_ptr<image> image_perlin(int32_t xs, int32_t ys, int32_t freq, int32_t oct, float fadeoff, int32_t seed, int32_t mode, float amp, float gamma, uint32_t col0, uint32_t col1)
+std::unique_ptr<image> image_perlin(int32_t xs, int32_t ys, int32_t freq, int32_t oct, float fadeoff, int32_t seed, image_perlin_mode m, float amp, float gamma, uint32_t col0, uint32_t col1)
   {
   if (xs < 1)
     return nullptr;
@@ -571,6 +571,7 @@ std::unique_ptr<image> image_perlin(int32_t xs, int32_t ys, int32_t freq, int32_
   int32_t shifty = 16 - get_power_2(bm->height());
   uint64_t* tile = bm->data();
   seed &= 255;
+  uint32_t mode = static_cast<uint32_t>(m);
   mode &= 3;
 
   int32_t i, noffs, x, y;
@@ -695,7 +696,7 @@ void image_init()
   init_perlin();
   }
 
-std::unique_ptr<image> image_normals(const std::unique_ptr<image>& im, float _dist, int32_t mode)
+std::unique_ptr<image> image_normals(const std::unique_ptr<image>& im, float _dist, image_normals_mode m)
   {
   int32_t shiftx, shifty;
   int32_t xs, ys;
@@ -714,6 +715,8 @@ std::unique_ptr<image> image_normals(const std::unique_ptr<image>& im, float _di
   ys = im->height();
   shiftx = get_power_2(im->width());
   shifty = get_power_2(im->height());
+
+  uint32_t mode = static_cast<uint32_t>(m);
 
   for (y = 0; y < ys; y++)
     {
@@ -768,7 +771,7 @@ std::unique_ptr<image> image_normals(const std::unique_ptr<image>& im, float _di
   return bm;
   }
 
-std::unique_ptr<image> image_gradient(int32_t xs, int32_t ys, uint32_t col0, uint32_t col1, float posf, float a, float length, int32_t mode)
+std::unique_ptr<image> image_gradient(int32_t xs, int32_t ys, uint32_t col0, uint32_t col1, float posf, float a, float length, image_gradient_mode m)
   {
   if (xs < 1)
     return nullptr;
@@ -795,6 +798,8 @@ std::unique_ptr<image> image_gradient(int32_t xs, int32_t ys, uint32_t col0, uin
   cdy = mul_shift(dy, 0x10000 / bm->height()) - bm->width() * cdx;
 
   c = 0x4000 - (dx / 2 + dy / 2) * (posf + 1);
+
+  uint32_t mode = static_cast<uint32_t>(m);
 
   tile = bm->data();
   for (y = 0; y < bm->height(); y++)
@@ -824,7 +829,7 @@ std::unique_ptr<image> image_gradient(int32_t xs, int32_t ys, uint32_t col0, uin
   return bm;
   }
 
-void image_glow_rect(std::unique_ptr<image>& im, float cx, float cy, float rx, float ry, float sx, float sy, uint32_t color, float alpha, float power, uint32_t wrap, uint32_t flags)
+void image_glow_rect(std::unique_ptr<image>& im, float cx, float cy, float rx, float ry, float sx, float sy, uint32_t color, float alpha, float power, image_glow_rect_wrap wrap, image_glow_rect_flags fl)
   {
   uint64_t* d;
   int32_t x, y;
@@ -833,21 +838,23 @@ void image_glow_rect(std::unique_ptr<image>& im, float cx, float cy, float rx, f
   uint64_t col;
   float fx, fy, thresh;
   int32_t low_table[32];
+  uint32_t flags = static_cast<uint32_t>(fl);
+
   bool circular = (flags & 2) == 0;
 
-  if (wrap == 1)
+  if (wrap == image_glow_rect_wrap::on)
     {
     if (cx + rx + sx > 1.0f)
-      image_glow_rect(im, cx - 1.0f, cy, rx, ry, sx, sy, color, alpha, power, 2, flags);
+      image_glow_rect(im, cx - 1.0f, cy, rx, ry, sx, sy, color, alpha, power, image_glow_rect_wrap::vertical, fl);
     if (cx - rx - sx < -0.0f)
-      image_glow_rect(im, cx + 1.0f, cy, rx, ry, sx, sy, color, alpha, power, 2, flags);
+      image_glow_rect(im, cx + 1.0f, cy, rx, ry, sx, sy, color, alpha, power, image_glow_rect_wrap::vertical, fl);
     }
-  if (wrap == 1 || wrap == 2)
+  if (wrap == image_glow_rect_wrap::on || wrap == image_glow_rect_wrap::vertical)
     {
     if (cy + ry + sy > 1.0f)
-      image_glow_rect(im, cx, cy - 1.0f, rx, ry, sx, sy, color, alpha, power, 0, flags);
+      image_glow_rect(im, cx, cy - 1.0f, rx, ry, sx, sy, color, alpha, power, image_glow_rect_wrap::repeat, fl);
     if (cy - ry - sy < -0.0f)
-      image_glow_rect(im, cx, cy + 1.0f, rx, ry, sx, sy, color, alpha, power, 0, flags);
+      image_glow_rect(im, cx, cy + 1.0f, rx, ry, sx, sy, color, alpha, power, image_glow_rect_wrap::repeat, fl);
     }
 
   if (power == 0)
@@ -926,7 +933,7 @@ void image_glow_rect(std::unique_ptr<image>& im, float cx, float cy, float rx, f
     }
   }
 
-std::unique_ptr<image> image_merge(int32_t mode, int32_t count, const std::unique_ptr<image>* i0, ...)
+std::unique_ptr<image> image_merge(image_merge_mode mode, int32_t count, const std::unique_ptr<image>* i0, ...)
   {
   if (i0 == nullptr)
     return nullptr;
@@ -951,16 +958,16 @@ std::unique_ptr<image> image_merge(int32_t mode, int32_t count, const std::uniqu
   while (i < count)
     {
     ii = va_arg(args, const std::unique_ptr<image>*);
-    image_inner(im_out->data(), (*ii)->data(), im_out->size(), mode);
+    image_inner(im_out->data(), (*ii)->data(), im_out->size(), static_cast<uint32_t>(mode));
     ++i;
     }
   va_end(args);
   return im_out;
   }
 
-void image_color(std::unique_ptr<image>& im, int32_t mode, uint32_t color)
+void image_color(std::unique_ptr<image>& im, image_color_mode mode, uint32_t color)
   {
-  int32_t inner_mode = mode + MERGEMODE_COLOR_MODES + 1;
+  int32_t inner_mode = static_cast<uint32_t>(mode) + MERGEMODE_COLOR_MODES + 1;
   uint64_t color64 = get_color_64(color);
-  image_inner(im->data(), &color64, im->size(), mode + MERGEMODE_COLOR_MODES + 1);
+  image_inner(im->data(), &color64, im->size(), inner_mode);
   }
