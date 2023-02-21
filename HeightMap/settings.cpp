@@ -8,6 +8,7 @@ settings::settings()
   frequency = 2;
   octaves = 6;
   fadeoff = 0.5f;
+  variation_fadeoff = 0.f;
   seed = 0;
   mode = 0;
   amplify = 1.f;
@@ -29,6 +30,8 @@ settings::settings()
   island_flags = 1;
   island_merge_mode = 2;
   island_invert = false;
+
+  auto_vary_colors = true;
   }
 
 
@@ -63,6 +66,8 @@ settings read_settings(const char* filename)
   f["island_merge_mode"] >> s.island_merge_mode;
   f["island_invert"] >> s.island_invert;
   f["export_folder"] >> s.export_folder;
+  f["auto_vary_colors"] >> s.auto_vary_colors;
+  f["variation_fadeoff"] >> s.variation_fadeoff;
 
   f["colors"] >> s.colors;
   f["heights"] >> s.heights;
@@ -100,6 +105,8 @@ void write_settings(const settings& s, const char* filename)
   f << "island_invert" << s.island_invert;
 
   f << "export_folder" << s.export_folder;
+  f << "auto_vary_colors" << s.auto_vary_colors;
+  f << "variation_fadeoff" << s.variation_fadeoff;
 
   f << "colors" << s.colors;
   f << "heights" << s.heights;

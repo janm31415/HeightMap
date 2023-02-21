@@ -13,6 +13,7 @@ struct settings
   int32_t frequency;
   int32_t octaves;
   float fadeoff;
+  float variation_fadeoff;
   int32_t seed;
   int32_t mode;
   float amplify;
@@ -34,6 +35,7 @@ struct settings
   int32_t island_flags;
   int32_t island_merge_mode;
   bool island_invert;
+  bool auto_vary_colors;
 
   int32_t render_target;
 

@@ -20,7 +20,7 @@
 namespace
   {
   template <typename T, typename Compare>
-  std::vector<std::size_t> sort_permutation(const std::vector<T>& vec, Compare& compare)
+  std::vector<std::size_t> sort_permutation(const std::vector<T>& vec, Compare compare)
     {
     std::vector<std::size_t> p(vec.size());
     std::iota(p.begin(), p.end(), 0);
@@ -108,7 +108,33 @@ namespace
     return clrs;
     }
 
-  std::unique_ptr<image> image_height_to_color(const std::unique_ptr<image>& im_height, std::vector<map_color> colors)
+  template <class T>
+  inline T clamp(T a, T minimum, T maximum)
+    {
+    return a < minimum ? minimum : a > maximum ? maximum : a;
+    }
+
+  uint64_t vary_color(uint64_t clr, uint64_t variation)
+    {
+    int64_t red = clr & 0x7fff;
+    int64_t green = (clr >> 16) & 0x7fff;
+    int64_t blue = (clr >> 32) & 0x7fff;
+    int64_t alpha = (clr >> 48) & 0x7fff;
+
+    int64_t var = ((variation & 0x7fff) >> 3) - (0x7fff>>4);
+    
+    red += var;
+    green += var;
+    blue += var;
+
+    red = clamp<int64_t>(red, 0, 0x7fff);
+    green = clamp<int64_t>(green, 0, 0x7fff);
+    blue = clamp<int64_t>(blue, 0, 0x7fff);
+
+    return alpha << 48 | blue << 32 | green << 16 | red;
+    }
+
+  std::unique_ptr<image> image_height_to_color(const std::unique_ptr<image>& im_height, const std::unique_ptr<image>& im_variation, std::vector<map_color> colors)
     {
     if (colors.empty())
       {
@@ -132,6 +158,10 @@ namespace
     uint64_t* dest = im_out->data();
     const uint64_t* height = im_height->data();
     uint32_t count = im_out->size();
+    uint64_t default_variation = 0;
+    const uint64_t* variation = &default_variation;
+    if (im_variation.get())
+      variation = im_variation->data();
     for (uint32_t i = 0; i < count; ++i)
       {
       double scale = (double)(*height & 0x7fff) / 0x7fff;
@@ -160,10 +190,13 @@ namespace
         rgba c3 = c1 * (1 - alpha) + c2 * alpha;
         *dest = get_color_64(c3.color());
         }
+      if (*variation)
+        *dest = vary_color(*dest, *variation);
       ++height;
       ++dest;
+      if (im_variation.get())
+        ++variation;
       }
-
     return im_out;
     }
 
@@ -187,6 +220,40 @@ namespace
     s.colors.push_back(0xff00e0e0);
     s.colors.push_back(0xff808080);
     s.colors.push_back(0xffffffff);
+    }
+
+  void make_color_set2(settings& s)
+    {
+    s.heights.clear();
+    s.colors.clear();
+    s.colors.push_back(rgba(59, 110, 202, 255).color()); s.heights.push_back(0);
+    s.colors.push_back(rgba(63, 114, 206, 255).color()); s.heights.push_back(0.01);
+    s.colors.push_back(rgba(215, 213, 136, 255).color()); s.heights.push_back(0.05);
+    s.colors.push_back(rgba(96, 163, 24, 255).color()); s.heights.push_back(0.1);
+    s.colors.push_back(rgba(70, 118, 16, 255).color()); s.heights.push_back(0.3);
+    s.colors.push_back(rgba(101, 79, 68, 255).color()); s.heights.push_back(0.425);
+    s.colors.push_back(rgba(86, 69, 61, 255).color()); s.heights.push_back(0.575);
+    s.colors.push_back(rgba(254, 255, 255, 255).color()); s.heights.push_back(0.9);
+    s.colors.push_back(rgba(255, 255, 255, 255).color()); s.heights.push_back(1.0);
+    }
+
+  void make_color_set3(settings& s)
+    {
+    s.heights.clear();
+    s.colors.clear();
+    s.colors.push_back(rgba(0, 63, 178, 255).color()); s.heights.push_back(0);
+    s.colors.push_back(rgba(11, 83, 200, 255).color()); s.heights.push_back(0.01);
+    s.colors.push_back(rgba(164, 150, 95, 255).color()); s.heights.push_back(0.05);
+    s.colors.push_back(rgba(132, 117, 70, 255).color()); s.heights.push_back(0.1);
+    s.colors.push_back(rgba(113, 101, 51, 255).color()); s.heights.push_back(0.2);
+    s.colors.push_back(rgba(120, 157, 81, 255).color()); s.heights.push_back(0.3);
+    s.colors.push_back(rgba(88, 128, 51, 255).color()); s.heights.push_back(0.4);
+    s.colors.push_back(rgba(59, 97, 20, 255).color()); s.heights.push_back(0.5);
+    s.colors.push_back(rgba(39, 77, 1, 255).color()); s.heights.push_back(0.6);
+    s.colors.push_back(rgba(141, 142, 124, 255).color()); s.heights.push_back(0.7);
+    s.colors.push_back(rgba(161, 164, 145, 255).color()); s.heights.push_back(0.8);
+    s.colors.push_back(rgba(235, 235, 237, 255).color()); s.heights.push_back(0.9);
+    s.colors.push_back(rgba(254, 254, 254, 255).color()); s.heights.push_back(1.0);
     }
 
   }
@@ -371,20 +438,24 @@ void view::_imgui_ui()
     ImGui::BeginChild("Colors", ImVec2(0.0, 270.0f), true);
     ImGui::BeginGroup();
 
-    if (ImGui::Button("Add", ImVec2(ImGui::GetContentRegionAvail().x * 0.5, 0)))
+    if (ImGui::Button("Add", ImVec2(ImGui::GetContentRegionAvail().x * 0.3333f, 0)))
       {
       _settings.heights.push_back(0.0);
       _settings.colors.push_back(0xff00ff00);
       _dirty = true;
       }
     ImGui::SameLine();
-    if (ImGui::Button("Sort", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+    if (ImGui::Button("Sort", ImVec2(ImGui::GetContentRegionAvail().x*0.5f, 0)))
       {
       auto p = sort_permutation(_settings.heights, [](auto left, auto right) { return left < right; });
       _settings.heights = apply_permutation(_settings.heights, p);
       _settings.colors = apply_permutation(_settings.colors, p);
       }
-
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Auto variation", &_settings.auto_vary_colors))
+      {
+      _dirty = true;
+      }
     uint32_t colors_size = (uint32_t)_settings.colors.size();
     if (_settings.heights.size() < colors_size)
       colors_size = (uint32_t)_settings.heights.size();
@@ -401,7 +472,7 @@ void view::_imgui_ui()
         uint32_t green = (uint32_t)(clr[1] * 255.f);
         uint32_t blue = (uint32_t)(clr[2] * 255.f);
         uint32_t alpha = (uint32_t)(clr[3] * 255.f);
-        _settings.colors[i] = alpha << 24 | blue << 16 | green <<  8 | red;
+        _settings.colors[i] = alpha << 24 | blue << 16 | green << 8 | red;
         _dirty = true;
         }
       ImGui::PopItemWidth();
@@ -433,7 +504,28 @@ void view::_imgui_ui()
       delete_items(_settings.colors, points_to_delete);
       delete_items(_settings.heights, points_to_delete);
       _dirty = true;
-      }    
+      }
+    if (ImGui::Button("Set1"))
+      {
+      make_color_set1(_settings);
+      _dirty = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Set2"))
+      {
+      make_color_set2(_settings);
+      _dirty = true;
+      }
+    ImGui::SameLine();
+    if (ImGui::Button("Set3"))
+      {
+      make_color_set3(_settings);
+      _dirty = true;
+      }
+    if (ImGui::SliderFloat("Variation fadeoff", &_settings.variation_fadeoff, -1.5f, 1.5f))
+      {
+      _dirty = true;
+      }
     ImGui::EndGroup();
     ImGui::EndChild();
 
@@ -525,6 +617,12 @@ void view::_imgui_ui()
       _settings.render_target = 3;
       _dirty = true;
       }
+    ImGui::SameLine();
+    if (ImGui::Button("Variation"))
+      {
+      _settings.render_target = 4;
+      _dirty = true;
+      }
     }
   ImGui::End();
 
@@ -597,7 +695,12 @@ void view::_check_image()
   _normalmap = image_normals(_heightmap, _settings.normalmap_strength, static_cast<image_normals_mode>(_settings.normalmap_mode));
 
   std::vector<map_color> colors = build_map_colors(_settings.colors, _settings.heights);
-  _colormap = image_height_to_color(_heightmap, colors);
+  std::unique_ptr<image> _variation;
+  if (_settings.auto_vary_colors || _settings.render_target == 4)
+    {
+    _variation = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff+_settings.variation_fadeoff, _settings.seed+1, static_cast<image_perlin_mode>(_settings.mode), _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);
+    }
+  _colormap = image_height_to_color(_heightmap, _variation, colors);
   if (_reallocate_sdl_surface)
     {
     SDL_FreeSurface(_heightmap_surface);
@@ -616,6 +719,10 @@ void view::_check_image()
       break;
     case 3:
       fill_sdl_surface(_heightmap_surface, _islandgradient);
+      break;
+    case 4:
+      if (_variation.get())
+        fill_sdl_surface(_heightmap_surface, _variation);      
       break;
     default:
       fill_sdl_surface(_heightmap_surface, _heightmap);
