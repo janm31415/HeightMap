@@ -6,7 +6,7 @@ Generate heightmaps with Perlin noise
 Use CMake to build for Windows or Macos and probably also Linux but I didn't test that.
 All dependencies are delivered with the code but don't forget to call
 
-    git submodule --init --update
+    git submodule update --init
     
 to download the submodules.
 
