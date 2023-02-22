@@ -12,8 +12,7 @@ struct settings
   int32_t height;
   int32_t frequency;
   int32_t octaves;
-  float fadeoff;
-  float variation_fadeoff;
+  float fadeoff;  
   int32_t seed;
   int32_t mode;
   float amplify;
@@ -40,6 +39,12 @@ struct settings
   int32_t render_target;
 
   std::string export_folder;
+
+  float variation_fadeoff;
+  int32_t variation_strength;
+  int32_t variation_mode;
+  int32_t variation_frequency;
+
 
   std::vector<uint32_t> colors;
   std::vector<double> heights;

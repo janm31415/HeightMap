@@ -30,6 +30,9 @@ settings::settings()
   island_flags = 1;
   island_merge_mode = 2;
   island_invert = false;
+  variation_strength = 2;
+  variation_mode = 0;
+  variation_frequency = 2;
 
   auto_vary_colors = true;
   }
@@ -68,6 +71,9 @@ settings read_settings(const char* filename)
   f["export_folder"] >> s.export_folder;
   f["auto_vary_colors"] >> s.auto_vary_colors;
   f["variation_fadeoff"] >> s.variation_fadeoff;
+  f["variation_strength"] >> s.variation_strength;
+  f["variation_mode"] >> s.variation_mode;
+  f["variation_frequency"] >> s.variation_frequency;
 
   f["colors"] >> s.colors;
   f["heights"] >> s.heights;
@@ -107,6 +113,9 @@ void write_settings(const settings& s, const char* filename)
   f << "export_folder" << s.export_folder;
   f << "auto_vary_colors" << s.auto_vary_colors;
   f << "variation_fadeoff" << s.variation_fadeoff;
+  f << "variation_strength" << s.variation_strength;
+  f << "variation_mode" << s.variation_mode;
+  f << "variation_frequency" << s.variation_frequency;
 
   f << "colors" << s.colors;
   f << "heights" << s.heights;

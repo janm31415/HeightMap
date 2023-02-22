@@ -114,15 +114,15 @@ namespace
     return a < minimum ? minimum : a > maximum ? maximum : a;
     }
 
-  uint64_t vary_color(uint64_t clr, uint64_t variation)
+  uint64_t vary_color(uint64_t clr, uint64_t variation, int32_t strength)
     {
     int64_t red = clr & 0x7fff;
     int64_t green = (clr >> 16) & 0x7fff;
     int64_t blue = (clr >> 32) & 0x7fff;
     int64_t alpha = (clr >> 48) & 0x7fff;
 
-    int64_t var = ((variation & 0x7fff) >> 3) - (0x7fff>>4);
-    
+    int64_t var = ((variation & 0x7fff) >> strength) - (0x7fff >> (1 + strength));
+
     red += var;
     green += var;
     blue += var;
@@ -134,7 +134,7 @@ namespace
     return alpha << 48 | blue << 32 | green << 16 | red;
     }
 
-  std::unique_ptr<image> image_height_to_color(const std::unique_ptr<image>& im_height, const std::unique_ptr<image>& im_variation, std::vector<map_color> colors)
+  std::unique_ptr<image> image_height_to_color(const std::unique_ptr<image>& im_height, const std::unique_ptr<image>& im_variation, std::vector<map_color> colors, int32_t variation_strength)
     {
     if (colors.empty())
       {
@@ -191,7 +191,7 @@ namespace
         *dest = get_color_64(c3.color());
         }
       if (*variation)
-        *dest = vary_color(*dest, *variation);
+        *dest = vary_color(*dest, *variation, variation_strength);
       ++height;
       ++dest;
       if (im_variation.get())
@@ -445,7 +445,7 @@ void view::_imgui_ui()
       _dirty = true;
       }
     ImGui::SameLine();
-    if (ImGui::Button("Sort", ImVec2(ImGui::GetContentRegionAvail().x*0.5f, 0)))
+    if (ImGui::Button("Sort", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f, 0)))
       {
       auto p = sort_permutation(_settings.heights, [](auto left, auto right) { return left < right; });
       _settings.heights = apply_permutation(_settings.heights, p);
@@ -522,7 +522,19 @@ void view::_imgui_ui()
       make_color_set3(_settings);
       _dirty = true;
       }
+    if (ImGui::InputInt("Variation strength", &_settings.variation_strength))
+      {
+      _dirty = true;
+      }
     if (ImGui::SliderFloat("Variation fadeoff", &_settings.variation_fadeoff, -1.5f, 1.5f))
+      {
+      _dirty = true;
+      }
+    if (ImGui::InputInt("Variation frequency", &_settings.variation_frequency))
+      {
+      _dirty = true;
+      }
+    if (ImGui::Combo("Variation mode", &_settings.variation_mode, height_mode, IM_ARRAYSIZE(height_mode)))
       {
       _dirty = true;
       }
@@ -698,9 +710,9 @@ void view::_check_image()
   std::unique_ptr<image> _variation;
   if (_settings.auto_vary_colors || _settings.render_target == 4)
     {
-    _variation = image_perlin(_settings.width, _settings.height, _settings.frequency, _settings.octaves, _settings.fadeoff+_settings.variation_fadeoff, _settings.seed+1, static_cast<image_perlin_mode>(_settings.mode), _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);
+    _variation = image_perlin(_settings.width, _settings.height, _settings.variation_frequency, _settings.octaves, _settings.variation_fadeoff, _settings.seed + 1, static_cast<image_perlin_mode>(_settings.variation_mode), _settings.amplify, _settings.gamma, 0xff000000, 0xffffffff);
     }
-  _colormap = image_height_to_color(_heightmap, _variation, colors);
+  _colormap = image_height_to_color(_heightmap, _variation, colors, _settings.variation_strength);
   if (_reallocate_sdl_surface)
     {
     SDL_FreeSurface(_heightmap_surface);
@@ -722,7 +734,7 @@ void view::_check_image()
       break;
     case 4:
       if (_variation.get())
-        fill_sdl_surface(_heightmap_surface, _variation);      
+        fill_sdl_surface(_heightmap_surface, _variation);
       break;
     default:
       fill_sdl_surface(_heightmap_surface, _heightmap);
